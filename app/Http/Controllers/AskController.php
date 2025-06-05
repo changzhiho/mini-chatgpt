@@ -37,7 +37,6 @@ class AskController extends Controller
                 model: $request->model
             );
 
-
             return redirect()->back()->with('message', $response);
         } catch (\Exception $e) {
             return redirect()->back()->with('error', 'Erreur: ' . $e->getMessage());

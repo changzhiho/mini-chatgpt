@@ -1,3 +1,62 @@
+<script setup>
+import { ref, computed, onMounted } from 'vue'
+import { useForm } from '@inertiajs/vue3'
+import AppLayout from '@/Layouts/AppLayout.vue'
+import MarkdownIt from 'markdown-it'
+import hljs from 'highlight.js'
+
+// Props reçues du contrôleur
+const props = defineProps({
+    models: Array,
+    selectedModel: String,
+})
+
+// Configuration de markdown-it avec highlight.js
+let md = null
+
+onMounted(() => {
+    md = new MarkdownIt({
+        html: true,
+        linkify: true,
+        typographer: true,
+        highlight: function (str, lang) {
+            if (lang && hljs.getLanguage(lang)) {
+                try {
+                    return '<pre class="hljs"><code>' +
+                        hljs.highlight(str, { language: lang, ignoreIllegals: true }).value +
+                        '</code></pre>'
+                } catch (__) { }
+            }
+
+            return '<pre class="hljs"><code>' + md.utils.escapeHtml(str) + '</code></pre>'
+        }
+    })
+})
+
+// Formulaire Inertia
+const form = useForm({
+    message: '',
+    model: props.selectedModel || '',
+})
+
+// Rendu du markdown
+const renderedMarkdown = computed(() => {
+    const message = props.$page?.props?.flash?.message || ''
+    if (!message || !md) return ''
+    return md.render(message)
+})
+
+// Soumission du formulaire
+const submitQuestion = () => {
+    form.post(route('ask.post'), {
+        preserveScroll: true,
+        onSuccess: () => {
+            form.reset('message')
+        },
+    })
+}
+</script>
+
 <template>
     <AppLayout title="Ask AI">
         <template #header>
@@ -93,65 +152,6 @@
         </div>
     </AppLayout>
 </template>
-
-<script setup>
-import { ref, computed, onMounted } from 'vue'
-import { useForm } from '@inertiajs/vue3'
-import AppLayout from '@/Layouts/AppLayout.vue'
-import MarkdownIt from 'markdown-it'
-import hljs from 'highlight.js'
-
-// Props reçues du contrôleur
-const props = defineProps({
-    models: Array,
-    selectedModel: String,
-})
-
-// Configuration de markdown-it avec highlight.js
-let md = null
-
-onMounted(() => {
-    md = new MarkdownIt({
-        html: true,
-        linkify: true,
-        typographer: true,
-        highlight: function (str, lang) {
-            if (lang && hljs.getLanguage(lang)) {
-                try {
-                    return '<pre class="hljs"><code>' +
-                        hljs.highlight(str, { language: lang, ignoreIllegals: true }).value +
-                        '</code></pre>'
-                } catch (__) { }
-            }
-
-            return '<pre class="hljs"><code>' + md.utils.escapeHtml(str) + '</code></pre>'
-        }
-    })
-})
-
-// Formulaire Inertia
-const form = useForm({
-    message: '',
-    model: props.selectedModel || '',
-})
-
-// Rendu du markdown
-const renderedMarkdown = computed(() => {
-    const message = props.$page?.props?.flash?.message || ''
-    if (!message || !md) return ''
-    return md.render(message)
-})
-
-// Soumission du formulaire
-const submitQuestion = () => {
-    form.post(route('ask.post'), {
-        preserveScroll: true,
-        onSuccess: () => {
-            form.reset('message')
-        },
-    })
-}
-</script>
 
 <style>
 /* Import des styles highlight.js */
