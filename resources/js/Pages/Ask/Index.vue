@@ -9,6 +9,7 @@ import hljs from 'highlight.js'
 const props = defineProps({
     models: Array,
     selectedModel: String,
+    flash:Object,
 })
 
 // Configuration de markdown-it avec highlight.js
@@ -41,7 +42,7 @@ const form = useForm({
 
 // Rendu du markdown
 const renderedMarkdown = computed(() => {
-    const message = props.$page?.props?.flash?.message || ''
+    const message = props.flash?.message || ''
     if (!message || !md) return ''
     return md.render(message)
 })
@@ -128,7 +129,7 @@ const submitQuestion = () => {
                                 </div>
                                 <div class="ml-3">
                                     <p class="text-sm text-red-800 dark:text-red-200">
-                                        {{ $page.props.flash.error }}
+                                        {{ props.flash.error }}
                                     </p>
                                 </div>
                             </div>
