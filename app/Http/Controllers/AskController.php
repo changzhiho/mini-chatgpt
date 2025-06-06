@@ -154,10 +154,27 @@ class AskController extends Controller
             'model' => $request->model ?? Auth::user()->preferred_model ?? ChatService::DEFAULT_MODEL
         ]);
 
-        return redirect()->back()->with([
-            'newConversationId' => $conversation->id
+        // Recharger toutes les conversations avec la nouvelle
+        $updatedConversations = Conversation::where('user_id', Auth::id())
+            ->orderBy('updated_at', 'desc')
+            ->with(['messages' => function ($query) {
+                $query->orderBy('created_at', 'asc');
+            }])
+            ->get();
+
+        // Retourner avec la nouvelle conversation sélectionnée
+        return Inertia::render('Ask/Index', [
+            'models' => (new ChatService())->getModels(),
+            'selectedModel' => Auth::user()->preferred_model ?? ChatService::DEFAULT_MODEL,
+            'conversations' => $updatedConversations,
+            'selectedConversationId' => $conversation->id, // Sélectionner automatiquement la nouvelle conversation
+            'flash' => [
+                'success' => true,
+                'message' => 'Nouvelle conversation créée'
+            ]
         ]);
     }
+
 
     public function deleteConversation($id)
     {

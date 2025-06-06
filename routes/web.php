@@ -23,9 +23,11 @@ Route::middleware([
         return Inertia::render('Dashboard');
     })->name('dashboard');
 
-    // Routes pour le chat - toutes protégées par l'authentification
+    // Routes pour le chat
     Route::get('/ask', [AskController::class, 'index'])->name('ask.index');
     Route::post('/ask', [AskController::class, 'ask'])->name('ask.post');
-    Route::post('/ask/conversation', [AskController::class, 'createConversation'])->name('ask.conversation.create');
-    Route::delete('/ask/conversation/{id}', [AskController::class, 'deleteConversation'])->name('ask.conversation.delete');
+
+    // Routes pour les conversations - chemins différents
+    Route::post('/ask/conversations', [AskController::class, 'createConversation'])->name('ask.conversation.create');
+    Route::delete('/ask/conversations/{id}', [AskController::class, 'deleteConversation'])->name('ask.conversation.delete');
 });

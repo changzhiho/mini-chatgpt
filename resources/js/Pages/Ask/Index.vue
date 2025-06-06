@@ -111,8 +111,10 @@ const createNewConversation = () => {
     conversationForm.model = currentModel.value
     conversationForm.post(route('ask.conversation.create'), {
         onSuccess: (page) => {
-            if (page.props.flash?.newConversationId) {
-                const newConversation = page.props.conversations.find(c => c.id === page.props.flash.newConversationId)
+            // La nouvelle conversation sera automatiquement sélectionnée
+            // grâce au selectedConversationId retourné par le controller
+            if (page.props.selectedConversationId) {
+                const newConversation = page.props.conversations.find(c => c.id === page.props.selectedConversationId)
                 if (newConversation) {
                     selectConversation(newConversation)
                 }
@@ -120,6 +122,7 @@ const createNewConversation = () => {
         }
     })
 }
+
 
 // Supprimer une conversation
 const deleteConversation = (conversationId) => {
