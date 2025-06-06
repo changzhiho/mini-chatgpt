@@ -11,6 +11,7 @@ const props = defineProps({
     selectedModel: String,
     conversations: Array,
     selectedConversationId: Number,
+    shouldFocusInput: Boolean,
     flash: Object,
     errors: Object,
 })
@@ -44,12 +45,18 @@ onMounted(() => {
     } else if (props.conversations.length > 0) {
         selectConversation(props.conversations[0])
     }
+
+    // Focus automatique si demandé
+    if (props.shouldFocusInput) {
+        focusMessageInput()
+    }
 })
 
 // État réactif
 const selectedConversation = ref(null)
 const currentModel = ref(props.selectedModel)
 const messagesContainer = ref(null)
+const messageInput = ref(null)
 
 // Formulaire Inertia pour envoyer des messages
 const messageForm = useForm({
@@ -97,6 +104,15 @@ const scrollToBottom = () => {
     })
 }
 
+// Focus automatique sur l'input
+const focusMessageInput = () => {
+    nextTick(() => {
+        if (messageInput.value) {
+            messageInput.value.focus()
+        }
+    })
+}
+
 // Sélectionner une conversation
 const selectConversation = (conversation) => {
     selectedConversation.value = conversation
@@ -104,12 +120,14 @@ const selectConversation = (conversation) => {
     messageForm.conversation_id = conversation.id
     messageForm.model = conversation.model || props.selectedModel
     scrollToBottom()
+    focusMessageInput()
 }
 
 // Créer une nouvelle conversation
 const createNewConversation = () => {
     conversationForm.model = currentModel.value
-    conversationForm.post(route('ask.conversation.create'), {
+    conversationForm.post(route('ask.conversations.create'), {
+        preserveScroll: true, // Préserver la position de scroll
         onSuccess: (page) => {
             // La nouvelle conversation sera automatiquement sélectionnée
             // grâce au selectedConversationId retourné par le controller
@@ -123,12 +141,12 @@ const createNewConversation = () => {
     })
 }
 
-
 // Supprimer une conversation
 const deleteConversation = (conversationId) => {
     if (!confirm('Êtes-vous sûr de vouloir supprimer cette conversation ?')) return
 
-    router.delete(route('ask.conversation.delete', conversationId), {
+    router.delete(route('ask.conversations.delete', conversationId), {
+        preserveScroll: true, // Préserver la position de scroll
         onSuccess: () => {
             if (selectedConversation.value?.id === conversationId) {
                 selectedConversation.value = null
@@ -147,6 +165,7 @@ const sendMessage = () => {
     messageForm.model = currentModel.value
 
     messageForm.post(route('ask.post'), {
+        preserveScroll: true, // CRUCIAL : Préserver la position de scroll
         onSuccess: (page) => {
             // Mettre à jour la conversation sélectionnée avec les nouvelles données
             if (page.props.selectedConversationId) {
@@ -154,12 +173,18 @@ const sendMessage = () => {
                 if (updatedConversation) {
                     selectedConversation.value = updatedConversation
                     scrollToBottom()
+
+                    // Focus automatique après réception de la réponse
+                    if (page.props.shouldFocusInput) {
+                        focusMessageInput()
+                    }
                 }
             }
             messageForm.reset('message')
         },
         onError: (errors) => {
             console.error('Erreurs:', errors)
+            focusMessageInput() // Focus même en cas d'erreur
         }
     })
 }
@@ -185,7 +210,13 @@ watch(() => props.conversations, (newConversations) => {
         const updatedConversation = newConversations.find(c => c.id === selectedConversation.value.id)
         if (updatedConversation) {
             selectedConversation.value = updatedConversation
-            nextTick(() => scrollToBottom())
+            nextTick(() => {
+                scrollToBottom()
+                // Focus automatique après mise à jour
+                if (props.shouldFocusInput) {
+                    focusMessageInput()
+                }
+            })
         }
     }
 }, { deep: true })
@@ -199,12 +230,19 @@ watch(() => props.selectedConversationId, (newId) => {
         }
     }
 })
+
+// Watcher pour le focus automatique
+watch(() => props.shouldFocusInput, (shouldFocus) => {
+    if (shouldFocus) {
+        focusMessageInput()
+    }
+})
 </script>
 
 <template>
     <AppLayout title="Ask AI">
         <div class="flex h-screen bg-gray-50 dark:bg-gray-900">
-            <!-- Sidebar -->
+            <!-- Sidebar avec scroll-region pour préserver la position -->
             <div class="w-64 bg-gray-900 text-white flex flex-col">
                 <!-- Header -->
                 <div class="p-4 border-b border-gray-700">
@@ -224,8 +262,8 @@ watch(() => props.selectedConversationId, (newId) => {
                     </button>
                 </div>
 
-                <!-- Conversations List -->
-                <div class="flex-1 overflow-y-auto p-2">
+                <!-- Conversations List avec scroll-region -->
+                <div class="flex-1 overflow-y-auto p-2" scroll-region>
                     <div
                         v-for="conversation in conversations"
                         :key="conversation.id"
@@ -277,8 +315,8 @@ watch(() => props.selectedConversationId, (newId) => {
                     </h1>
                 </div>
 
-                <!-- Messages -->
-                <div ref="messagesContainer" class="flex-1 overflow-y-auto p-4 space-y-4">
+                <!-- Messages avec scroll-region -->
+                <div ref="messagesContainer" class="flex-1 overflow-y-auto p-4 space-y-4" scroll-region>
                     <div v-if="!selectedConversation" class="text-center text-gray-500 mt-20">
                         <svg class="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
@@ -356,6 +394,7 @@ watch(() => props.selectedConversationId, (newId) => {
                         <div class="flex space-x-4">
                             <div class="flex-1">
                                 <textarea
+                                    ref="messageInput"
                                     v-model="messageForm.message"
                                     :disabled="messageForm.processing"
                                     @keydown="handleKeydown"

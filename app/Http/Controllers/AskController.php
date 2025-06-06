@@ -103,12 +103,13 @@ class AskController extends Controller
                 }])
                 ->get();
 
-            // Retourner avec les données complètes mises à jour
+            // Retourner avec preserveScroll et les données complètes mises à jour
             return Inertia::render('Ask/Index', [
                 'models' => (new ChatService())->getModels(),
                 'selectedModel' => $user->preferred_model,
                 'conversations' => $updatedConversations,
                 'selectedConversationId' => $conversation->id,
+                'shouldFocusInput' => true, // Signal pour focus automatique
                 'flash' => [
                     'success' => true,
                     'message' => 'Message envoyé avec succès'
@@ -117,7 +118,7 @@ class AskController extends Controller
         } catch (\Exception $e) {
             return redirect()->back()->withErrors([
                 'message' => 'Erreur: ' . $e->getMessage()
-            ]);
+            ])->with('preserveScroll', true);
         }
     }
 
@@ -162,19 +163,19 @@ class AskController extends Controller
             }])
             ->get();
 
-        // Retourner avec la nouvelle conversation sélectionnée
+        // Retourner avec la nouvelle conversation sélectionnée et focus automatique
         return Inertia::render('Ask/Index', [
             'models' => (new ChatService())->getModels(),
             'selectedModel' => Auth::user()->preferred_model ?? ChatService::DEFAULT_MODEL,
             'conversations' => $updatedConversations,
-            'selectedConversationId' => $conversation->id, // Sélectionner automatiquement la nouvelle conversation
+            'selectedConversationId' => $conversation->id,
+            'shouldFocusInput' => true, // Focus automatique pour nouvelle conversation
             'flash' => [
                 'success' => true,
                 'message' => 'Nouvelle conversation créée'
             ]
         ]);
     }
-
 
     public function deleteConversation($id)
     {
