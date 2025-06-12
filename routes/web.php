@@ -23,11 +23,8 @@ Route::middleware([
         return Inertia::render('Dashboard');
     })->name('dashboard');
 
-    // Routes pour le chat avec préservation du scroll
     Route::get('/ask', [AskController::class, 'index'])->name('ask.index');
     Route::post('/ask', [AskController::class, 'ask'])->name('ask.post');
-
-    // Routes pour les conversations - chemins différents pour éviter les conflits
-    Route::post('/ask/conversations', [AskController::class, 'createConversation'])->name('ask.conversations.create');
-    Route::delete('/ask/conversations/{id}', [AskController::class, 'deleteConversation'])->name('ask.conversations.delete');
+    Route::post('/ask/new', [AskController::class, 'createConversation'])->name('ask.new');
+    Route::delete('/ask/{id}', [AskController::class, 'deleteConversation'])->name('ask.delete');
 });

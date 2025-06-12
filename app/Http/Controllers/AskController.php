@@ -95,31 +95,48 @@ class AskController extends Controller
 
             $conversation->touch();
 
-            // Recharger toutes les conversations avec les messages mis à jour
-            $updatedConversations = Conversation::where('user_id', Auth::id())
-                ->orderBy('updated_at', 'desc')
-                ->with(['messages' => function ($query) {
-                    $query->orderBy('created_at', 'asc');
-                }])
-                ->get();
-
-            // Retourner avec preserveScroll et les données complètes mises à jour
-            return Inertia::render('Ask/Index', [
-                'models' => (new ChatService())->getModels(),
-                'selectedModel' => $user->preferred_model,
-                'conversations' => $updatedConversations,
+            return redirect()->back()->with([
                 'selectedConversationId' => $conversation->id,
-                'shouldFocusInput' => true, // Signal pour focus automatique
-                'flash' => [
-                    'success' => true,
-                    'message' => 'Message envoyé avec succès'
-                ]
+                'shouldFocusInput' => true
             ]);
         } catch (\Exception $e) {
             return redirect()->back()->withErrors([
                 'message' => 'Erreur: ' . $e->getMessage()
-            ])->with('preserveScroll', true);
+            ]);
         }
+    }
+
+    public function createConversation(Request $request)
+    {
+        $conversation = Conversation::create([
+            'user_id' => Auth::id(),
+            'title' => 'Nouvelle conversation',
+            'model' => $request->model ?? Auth::user()->preferred_model ?? ChatService::DEFAULT_MODEL
+        ]);
+
+        return redirect()->route('ask.index')->with([
+            'selectedConversationId' => $conversation->id,
+            'shouldFocusInput' => true,
+            'newConversationCreated' => true
+        ]);
+    }
+
+
+
+    public function deleteConversation($id)
+    {
+        $conversation = Conversation::where('user_id', Auth::id())->findOrFail($id);
+        $conversation->delete();
+
+        // Sélectionner la première conversation restante
+        $nextConversation = Conversation::where('user_id', Auth::id())
+            ->orderBy('updated_at', 'desc')
+            ->first();
+
+        return redirect()->route('ask.index')->with([
+            'selectedConversationId' => $nextConversation?->id,
+            'shouldFocusInput' => true
+        ]);
     }
 
     private function generateConversationTitle($conversation, $firstMessage)
@@ -145,43 +162,5 @@ class AskController extends Controller
         } catch (\Exception $e) {
             // En cas d'erreur, garder le titre par défaut
         }
-    }
-
-    public function createConversation(Request $request)
-    {
-        $conversation = Conversation::create([
-            'user_id' => Auth::id(),
-            'title' => 'Nouvelle conversation',
-            'model' => $request->model ?? Auth::user()->preferred_model ?? ChatService::DEFAULT_MODEL
-        ]);
-
-        // Recharger toutes les conversations avec la nouvelle
-        $updatedConversations = Conversation::where('user_id', Auth::id())
-            ->orderBy('updated_at', 'desc')
-            ->with(['messages' => function ($query) {
-                $query->orderBy('created_at', 'asc');
-            }])
-            ->get();
-
-        // Retourner avec la nouvelle conversation sélectionnée et focus automatique
-        return Inertia::render('Ask/Index', [
-            'models' => (new ChatService())->getModels(),
-            'selectedModel' => Auth::user()->preferred_model ?? ChatService::DEFAULT_MODEL,
-            'conversations' => $updatedConversations,
-            'selectedConversationId' => $conversation->id,
-            'shouldFocusInput' => true, // Focus automatique pour nouvelle conversation
-            'flash' => [
-                'success' => true,
-                'message' => 'Nouvelle conversation créée'
-            ]
-        ]);
-    }
-
-    public function deleteConversation($id)
-    {
-        $conversation = Conversation::where('user_id', Auth::id())->findOrFail($id);
-        $conversation->delete();
-
-        return redirect()->back();
     }
 }
