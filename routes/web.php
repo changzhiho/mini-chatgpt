@@ -1,6 +1,7 @@
 <?php
 
 use Inertia\Inertia;
+use App\Http\Controllers\InstructionsController;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Foundation\Application;
 use App\Http\Controllers\AskController;
@@ -23,4 +24,6 @@ Route::middleware([
     Route::post('ask/new', [AskController::class, 'createConversation'])->name('ask.new');
     Route::post('ask/{id}/share', [AskController::class, 'share'])->name('ask.share');
     Route::delete('ask/{id}', [AskController::class, 'deleteConversation'])->name('ask.delete');
+    Route::get('/instructions', [InstructionsController::class, 'edit'])->name('instructions.edit');
+    Route::post('/instructions', [InstructionsController::class, 'update'])->name('instructions.update');
 });
