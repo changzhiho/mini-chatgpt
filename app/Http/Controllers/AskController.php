@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
 use App\Models\Conversation;
 use App\Models\Message;
+use League\Uri\IPv4\Converter;
 
 class AskController extends Controller
 {
@@ -116,12 +117,11 @@ class AskController extends Controller
 
         return redirect()->route('ask.index')->with([
             'selectedConversationId' => $conversation->id,
+            'selectedConversationUuid' => $conversation->uuid,
             'shouldFocusInput' => true,
             'newConversationCreated' => true
         ]);
     }
-
-
 
     public function deleteConversation($id)
     {
@@ -162,5 +162,18 @@ class AskController extends Controller
         } catch (\Exception $e) {
             // En cas d'erreur, garder le titre par défaut
         }
+    }
+
+    public function share($id)
+    {
+        $conversation = Conversation::find($id);
+        if ($conversation->user_id !== Auth::id()) {
+            abort(403, 'Vous n\'êtes pas autorisé à partager cette conversation.');
+        }
+
+        return redirect()->back()->with([
+            'share_url' => route('conversation.share', $conversation->uuid),
+            'share_success' => true
+        ]);
     }
 }

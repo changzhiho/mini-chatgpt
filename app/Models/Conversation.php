@@ -4,15 +4,21 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use App\Traits\HasUuid;
 
 class Conversation extends Model
 {
-    use HasFactory;
+    use HasFactory, HasUuid;
 
     protected $fillable = [
         'user_id',
         'title',
-        'model'
+        'model',
+        'uuid'
+    ];
+
+    protected $casts = [
+        'uuid' => 'string',
     ];
 
     public function user()
@@ -32,5 +38,11 @@ class Conversation extends Model
         static::deleting(function ($conversation) {
             $conversation->messages()->delete();
         });
+    }
+
+    // Méthode pour obtenir l'URL de partage
+    public function getShareUrlAttribute()
+    {
+        return route('conversation.share', $this->uuid);
     }
 }

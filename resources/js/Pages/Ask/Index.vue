@@ -182,6 +182,38 @@ const handleKeydown = (event) => {
     }
 }
 
+// Partage de conversations
+const shareConversation = (conversation) => {
+    router.post(`/ask/${conversation.id}/share`, {}, {
+        preserveScroll: true,
+        onSuccess: (page) => {
+            const shareUrl = page.props.flash?.share_url
+            if (shareUrl && page.props.flash?.share_success) {
+                // Copier l'URL dans le presse-papier
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(shareUrl)
+                        .then(() => {
+                            alert('Lien de partage copié dans le presse-papier !')
+                        })
+                        .catch(err => {
+                            console.error('Erreur lors de la copie:', err)
+                            // Fallback si la copie échoue
+                            prompt('Copiez ce lien de partage:', shareUrl)
+                        })
+                } else {
+                    // Fallback pour les navigateurs plus anciens
+                    prompt('Copiez ce lien de partage:', shareUrl)
+                }
+            }
+        },
+        onError: (errors) => {
+            console.error('Erreurs:', errors)
+            alert('Erreur lors de la génération du lien de partage')
+        }
+    })
+}
+
+
 // Watcher pour mettre à jour le modèle
 watch(currentModel, (newModel) => {
     messageForm.model = newModel
@@ -213,6 +245,21 @@ watch(() => props.flash, (newFlash, oldFlash) => {
         focusMessageInput()
     }
 }, { deep: true })
+
+// Watcher pour gérer les données de partage
+watch(() => props.flash, (newFlash, oldFlash) => {
+    if (newFlash?.selectedConversationId && newFlash.selectedConversationId !== oldFlash?.selectedConversationId) {
+        const conversation = props.conversations.find(c => c.id === newFlash.selectedConversationId)
+        if (conversation) {
+            selectConversation(conversation)
+        }
+    }
+    if (newFlash?.shouldFocusInput) {
+        focusMessageInput()
+    }
+}, { deep: true })
+
+
 </script>
 
 <template>
@@ -285,20 +332,37 @@ watch(() => props.flash, (newFlash, oldFlash) => {
                                 : 'hover:bg-gray-800'
                         ]"
                     >
-                        <div class="text-sm font-medium truncate">
+                        <div class="text-sm font-medium truncate pr-16">
                             {{ conversation.title }}
                         </div>
                         <div class="text-xs text-gray-400 mt-1">
                             {{ formatDate(conversation.updated_at) }}
                         </div>
-                        <button
-                            @click.stop="deleteConversation(conversation.id)"
-                            class="absolute right-2 top-2 opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-400 transition-all"
-                        >
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                            </svg>
-                        </button>
+
+                        <!-- Container pour les boutons d'action -->
+                        <div class="absolute right-2 top-2 opacity-0 group-hover:opacity-100 flex space-x-1">
+                            <!-- Bouton de partage -->
+                            <button
+                                @click.stop="shareConversation(conversation)"
+                                class="text-gray-400 hover:text-blue-400 transition-all p-1 rounded"
+                                title="Partager cette conversation"
+                            >
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.367 2.684 3 3 0 00-5.367-2.684z"></path>
+                                </svg>
+                            </button>
+
+                            <!-- Bouton de suppression -->
+                            <button
+                                @click.stop="deleteConversation(conversation.id)"
+                                class="text-gray-400 hover:text-red-400 transition-all p-1 rounded"
+                                title="Supprimer cette conversation"
+                            >
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                </svg>
+                            </button>
+                        </div>
                     </div>
                 </div>
 
