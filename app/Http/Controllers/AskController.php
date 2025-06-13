@@ -89,9 +89,9 @@ class AskController extends Controller
                 'content' => $response
             ]);
 
-            // Générer un titre si c'est le premier échange
+            // Générer un titre si c'est le premier échange (MODIFIÉ)
             if ($conversation->messages()->count() === 2 && $conversation->title === 'Nouvelle conversation') {
-                $this->generateConversationTitle($conversation, $request->message);
+                $this->generateConversationTitle($conversation, $request->message, $response);
             }
 
             $conversation->touch();
@@ -139,17 +139,25 @@ class AskController extends Controller
         ]);
     }
 
-    private function generateConversationTitle($conversation, $firstMessage)
+    private function generateConversationTitle($conversation, $userMessage, $aiResponse)
     {
         try {
             $titleMessages = [
                 [
                     'role' => 'system',
-                    'content' => 'Génère un titre court et descriptif (maximum 50 caractères) pour cette conversation basé sur le premier message de l\'utilisateur. Réponds uniquement avec le titre, sans guillemets ni ponctuation supplémentaire.'
+                    'content' => 'Génère un titre court et descriptif (maximum 50 caractères) pour cette conversation basé sur la question de l\'utilisateur et la réponse de l\'IA. Le titre doit résumer le sujet principal abordé. Réponds uniquement avec le titre, sans guillemets ni ponctuation supplémentaire.'
                 ],
                 [
                     'role' => 'user',
-                    'content' => $firstMessage
+                    'content' => $userMessage
+                ],
+                [
+                    'role' => 'assistant',
+                    'content' => $aiResponse
+                ],
+                [
+                    'role' => 'user',
+                    'content' => 'Génère maintenant un titre pour cette conversation:'
                 ]
             ];
 
