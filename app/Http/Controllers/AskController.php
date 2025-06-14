@@ -64,8 +64,24 @@ class AskController extends Controller
         ]);
 
         try {
+            // Préparer le message système avec les instructions personnalisées
+            $systemMessages = [];
+            if ($user->instructions_about || $user->instructions_how) {
+                $instructions = "Instructions personnalisées de l'utilisateur :\n";
+                if ($user->instructions_about) {
+                    $instructions .= "À propos de l'utilisateur : " . $user->instructions_about . "\n";
+                }
+                if ($user->instructions_how) {
+                    $instructions .= "Style de réponse souhaité : " . $user->instructions_how . "\n";
+                }
+                $systemMessages[] = [
+                    'role' => 'system',
+                    'content' => $instructions
+                ];
+            }
+
             // Préparer tous les messages de la conversation pour l'API
-            $messages = $conversation->messages()
+            $userMessages = $conversation->messages()
                 ->orderBy('created_at', 'asc')
                 ->get()
                 ->map(function ($message) {
@@ -76,9 +92,12 @@ class AskController extends Controller
                 })
                 ->toArray();
 
+            // Fusionner instructions système et messages de la conversation
+            $finalMessages = array_merge($systemMessages, $userMessages);
+
             // Utiliser votre ChatService existant
             $response = (new ChatService())->sendMessage(
-                messages: $messages,
+                messages: $finalMessages,
                 model: $request->model
             );
 
@@ -89,7 +108,7 @@ class AskController extends Controller
                 'content' => $response
             ]);
 
-            // Générer un titre si c'est le premier échange (MODIFIÉ)
+            // Générer un titre si c'est le premier échange
             if ($conversation->messages()->count() === 2 && $conversation->title === 'Nouvelle conversation') {
                 $this->generateConversationTitle($conversation, $request->message, $response);
             }
@@ -149,7 +168,7 @@ class AskController extends Controller
                 ],
                 [
                     'role' => 'user',
-                    'content' => $userMessage
+                    $content = 'content' => $userMessage
                 ],
                 [
                     'role' => 'assistant',

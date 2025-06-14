@@ -10,9 +10,11 @@ class InstructionsController extends Controller
 {
     public function edit()
     {
+        $user = Auth::user();
+
         return Inertia::render('Instructions/Edit', [
-            'instructions_about' => Auth::user()->instructions_about,
-            'instructions_how' => Auth::user()->instructions_how,
+            'instructions_about' => $user->instructions_about,
+            'instructions_how' => $user->instructions_how,
         ]);
     }
 
@@ -24,10 +26,11 @@ class InstructionsController extends Controller
         ]);
 
         $user = Auth::user();
-        $user->instructions_about = $request->instructions_about;
-        $user->instructions_how = $request->instructions_how;
-        $user->save();
+        $user->update([
+            'instructions_about' => $request->instructions_about,
+            'instructions_how' => $request->instructions_how,
+        ]);
 
-        return redirect()->route('instructions.edit')->with('success', 'Instructions mises à jour !');
+        return redirect()->route('ask.index')->with('success', 'Instructions mises à jour avec succès !');
     }
 }
