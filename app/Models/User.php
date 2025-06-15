@@ -32,6 +32,7 @@ class User extends Authenticatable
         'preferred_model',
         'instructions_about',
         'instructions_how',
+        'custom_commands',
     ];
 
     /**

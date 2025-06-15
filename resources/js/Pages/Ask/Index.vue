@@ -302,7 +302,7 @@ watch(() => props.flash, (newFlash, oldFlash) => {
                     </button>
                 </div>
 
-                <!-- Model Selector - EN HAUT pour mobile -->
+                <!-- Model Selector pour mobile -->
                 <div class="p-4 border-b border-gray-700 md:hidden">
                     <label class="block text-sm font-medium mb-2">Modèle IA</label>
                     <select
@@ -315,9 +315,8 @@ watch(() => props.flash, (newFlash, oldFlash) => {
                     </select>
                 </div>
 
-                <!-- Conversations List avec hauteur adaptée -->
                 <div class="flex-1 overflow-y-auto p-2 min-h-0">
-                    <!-- Lien Instructions (mobile uniquement) -->
+                    <!-- Lien Instructions mobile -->
                     <div class="md:hidden mb-4">
                         <a
                             :href="route('instructions.edit')"
@@ -328,6 +327,16 @@ watch(() => props.flash, (newFlash, oldFlash) => {
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                             </svg>
                             Instructions
+                        </a>
+                        <a
+                            :href="route('commands.edit')"
+                            class="block p-3 rounded-lg text-gray-300 hover:bg-gray-800 transition-colors"
+                            @click="isSidebarOpen = false"
+                        >
+                            <svg class="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                            </svg>
+                            Commandes
                         </a>
                     </div>
 
@@ -436,6 +445,16 @@ watch(() => props.flash, (newFlash, oldFlash) => {
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                                 </svg>
                                 Instructions
+                            </a>
+                            <a
+                                :href="route('commands.edit')"
+                                class="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                                @click="showSettingsMenu = false"
+                            >
+                                    <svg class="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                                    </svg>
+                                Commandes
                             </a>
                         </div>
                     </div>

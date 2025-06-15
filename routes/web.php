@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Foundation\Application;
 use App\Http\Controllers\AskController;
 use App\Http\Controllers\SharedConversationController;
+use App\Http\Controllers\CommandsController;
 
 Route::get('shared/{conversation}', [SharedConversationController::class, 'show'])->name('conversation.share');
 
@@ -26,4 +27,6 @@ Route::middleware([
     Route::delete('ask/{id}', [AskController::class, 'deleteConversation'])->name('ask.delete');
     Route::get('/instructions', [InstructionsController::class, 'edit'])->name('instructions.edit');
     Route::post('/instructions', [InstructionsController::class, 'update'])->name('instructions.update');
+    Route::get('/commands', [CommandsController::class, 'edit'])->name('commands.edit');
+    Route::post('/commands', [CommandsController::class, 'update'])->name('commands.update');
 });

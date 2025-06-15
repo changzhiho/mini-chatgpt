@@ -56,7 +56,10 @@ class AskController extends Controller
         // Sauvegarder le modèle préféré de l'utilisateur
         $user->update(['preferred_model' => $request->model]);
 
-        // Sauvegarder le message utilisateur
+        // Traiter les commandes personnalisées
+        $processedMessage = $this->processCustomCommands($request->message, $user);
+
+        // Sauvegarder le message utilisateur (original)
         $userMessage = Message::create([
             'conversation_id' => $conversation->id,
             'role' => 'user',
@@ -84,7 +87,14 @@ class AskController extends Controller
             $userMessages = $conversation->messages()
                 ->orderBy('created_at', 'asc')
                 ->get()
-                ->map(function ($message) {
+                ->map(function ($message) use ($processedMessage, $request) {
+                    // Remplacer le dernier message par la version traitée
+                    if ($message->content === $request->message && $message->role === 'user') {
+                        return [
+                            'role' => $message->role,
+                            'content' => $processedMessage
+                        ];
+                    }
                     return [
                         'role' => $message->role,
                         'content' => $message->content
@@ -125,6 +135,7 @@ class AskController extends Controller
             ]);
         }
     }
+
 
     public function createConversation(Request $request)
     {
@@ -202,5 +213,55 @@ class AskController extends Controller
             'share_url' => route('conversation.share', $conversation->uuid),
             'share_success' => true
         ]);
+    }
+
+    private function processCustomCommands($message, $user)
+    {
+        // Si pas de commandes personnalisées, retourner le message original
+        if (!$user->custom_commands) {
+            return $message;
+        }
+
+        // Parser les commandes personnalisées
+        $commands = $this->parseCustomCommands($user->custom_commands);
+
+        // Vérifier si le message commence par une commande
+        foreach ($commands as $command => $description) {
+            if (strpos(trim($message), $command) === 0) {
+                // Extraire les arguments après la commande
+                $args = trim(substr($message, strlen($command)));
+
+                // Construire le message pour l'IA
+                $processedMessage = $description;
+                if ($args) {
+                    $processedMessage .= " " . $args;
+                }
+
+                return $processedMessage;
+            }
+        }
+
+        // Si aucune commande trouvée, retourner le message original
+        return $message;
+    }
+
+    private function parseCustomCommands($customCommands)
+    {
+        $commands = [];
+        $lines = explode("\n", $customCommands);
+
+        foreach ($lines as $line) {
+            $line = trim($line);
+            if (empty($line)) continue;
+
+            // Format attendu: "/commande: description"
+            if (preg_match('/^(\/\w+)\s*:\s*(.+)$/', $line, $matches)) {
+                $command = trim($matches[1]);
+                $description = trim($matches[2]);
+                $commands[$command] = $description;
+            }
+        }
+
+        return $commands;
     }
 }
