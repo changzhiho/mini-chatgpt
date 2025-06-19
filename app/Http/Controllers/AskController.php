@@ -56,7 +56,10 @@ class AskController extends Controller
         // Sauvegarder le modèle préféré de l'utilisateur
         $user->update(['preferred_model' => $request->model]);
 
-        // Sauvegarder le message utilisateur
+        // Traiter les commandes personnalisées
+        $processedMessage = $this->processCustomCommands($request->message, $user);
+
+        // Sauvegarder le message utilisateur (original)
         $userMessage = Message::create([
             'conversation_id' => $conversation->id,
             'role' => 'user',
@@ -64,11 +67,34 @@ class AskController extends Controller
         ]);
 
         try {
+            // Préparer le message système avec les instructions personnalisées
+            $systemMessages = [];
+            if ($user->instructions_about || $user->instructions_how) {
+                $instructions = "Instructions personnalisées de l'utilisateur :\n";
+                if ($user->instructions_about) {
+                    $instructions .= "À propos de l'utilisateur : " . $user->instructions_about . "\n";
+                }
+                if ($user->instructions_how) {
+                    $instructions .= "Style de réponse souhaité : " . $user->instructions_how . "\n";
+                }
+                $systemMessages[] = [
+                    'role' => 'system',
+                    'content' => $instructions
+                ];
+            }
+
             // Préparer tous les messages de la conversation pour l'API
-            $messages = $conversation->messages()
+            $userMessages = $conversation->messages()
                 ->orderBy('created_at', 'asc')
                 ->get()
-                ->map(function ($message) {
+                ->map(function ($message) use ($processedMessage, $request) {
+                    // Remplacer le dernier message par la version traitée
+                    if ($message->content === $request->message && $message->role === 'user') {
+                        return [
+                            'role' => $message->role,
+                            'content' => $processedMessage
+                        ];
+                    }
                     return [
                         'role' => $message->role,
                         'content' => $message->content
@@ -76,9 +102,12 @@ class AskController extends Controller
                 })
                 ->toArray();
 
+            // Fusionner instructions système et messages de la conversation
+            $finalMessages = array_merge($systemMessages, $userMessages);
+
             // Utiliser votre ChatService existant
             $response = (new ChatService())->sendMessage(
-                messages: $messages,
+                messages: $finalMessages,
                 model: $request->model
             );
 
@@ -89,7 +118,7 @@ class AskController extends Controller
                 'content' => $response
             ]);
 
-            // Générer un titre si c'est le premier échange (MODIFIÉ)
+            // Générer un titre si c'est le premier échange
             if ($conversation->messages()->count() === 2 && $conversation->title === 'Nouvelle conversation') {
                 $this->generateConversationTitle($conversation, $request->message, $response);
             }
@@ -106,6 +135,7 @@ class AskController extends Controller
             ]);
         }
     }
+
 
     public function createConversation(Request $request)
     {
@@ -149,7 +179,7 @@ class AskController extends Controller
                 ],
                 [
                     'role' => 'user',
-                    'content' => $userMessage
+                    $content = 'content' => $userMessage
                 ],
                 [
                     'role' => 'assistant',
@@ -183,5 +213,55 @@ class AskController extends Controller
             'share_url' => route('conversation.share', $conversation->uuid),
             'share_success' => true
         ]);
+    }
+
+    private function processCustomCommands($message, $user)
+    {
+        // Si pas de commandes personnalisées, retourner le message original
+        if (!$user->custom_commands) {
+            return $message;
+        }
+
+        // Parser les commandes personnalisées
+        $commands = $this->parseCustomCommands($user->custom_commands);
+
+        // Vérifier si le message commence par une commande
+        foreach ($commands as $command => $description) {
+            if (strpos(trim($message), $command) === 0) {
+                // Extraire les arguments après la commande
+                $args = trim(substr($message, strlen($command)));
+
+                // Construire le message pour l'IA
+                $processedMessage = $description;
+                if ($args) {
+                    $processedMessage .= " " . $args;
+                }
+
+                return $processedMessage;
+            }
+        }
+
+        // Si aucune commande trouvée, retourner le message original
+        return $message;
+    }
+
+    private function parseCustomCommands($customCommands)
+    {
+        $commands = [];
+        $lines = explode("\n", $customCommands);
+
+        foreach ($lines as $line) {
+            $line = trim($line);
+            if (empty($line)) continue;
+
+            // Format attendu: "/commande: description"
+            if (preg_match('/^(\/\w+)\s*:\s*(.+)$/', $line, $matches)) {
+                $command = trim($matches[1]);
+                $description = trim($matches[2]);
+                $commands[$command] = $description;
+            }
+        }
+
+        return $commands;
     }
 }

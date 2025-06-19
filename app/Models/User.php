@@ -29,6 +29,10 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'preferred_model',
+        'instructions_about',
+        'instructions_how',
+        'custom_commands',
     ];
 
     /**
