@@ -221,6 +221,26 @@ class AskController extends Controller
 
     private function processCustomCommands($message, $user)
     {
+        if (strpos(trim($message), '/meteo') === 0) {
+            $city = trim(substr($message, 6));
+            if (empty($city)) {
+                return "Veuillez spécifier une ville. Exemple: /meteo Paris";
+            }
+
+            $weatherService = new \App\Services\WeatherService();
+            $weather = $weatherService->getCurrentWeather($city);
+
+            if (isset($weather['error'])) {
+                return "Erreur météo: " . $weather['error'];
+            }
+
+            $temp = $weather['main']['temp'] ?? 'N/A';
+            $description = $weather['weather'][0]['description'] ?? 'N/A';
+            $humidity = $weather['main']['humidity'] ?? 'N/A';
+
+            return "Météo actuelle à {$city}: {$temp}°C, {$description}, humidité {$humidity}%. Présente ces informations de manière naturelle.";
+        }
+
         if (!$user->custom_commands) {
             return $message;
         }
