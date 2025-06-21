@@ -28,7 +28,7 @@ const submit = () => {
     });
 };
 
-const logoutMessage = usePage().props.flash?.lougout_message
+const logoutMessage = usePage().props.flash?.logout_message
 
 if (logoutMessage) {
     alert(logoutMessage)
