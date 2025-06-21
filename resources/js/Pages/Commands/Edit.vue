@@ -5,10 +5,12 @@ import AppLayout from '@/Layouts/AppLayout.vue'
 const props = defineProps({
     custom_commands: String,
     success: String,
+    from_conversation: String,
 })
 
 const form = useForm({
     custom_commands: props.custom_commands || '',
+    from_conversation: props.from_conversation,
 })
 
 const submit = () => {

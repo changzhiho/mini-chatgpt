@@ -9,6 +9,7 @@ const props = defineProps({
     models: Array,
     selectedModel: String,
     conversations: Array,
+    selectedConversationId: [String, Number],
     flash: Object,
     errors: Object,
 })
@@ -73,6 +74,15 @@ const initializeConversationSelection = () => {
             return
         }
     }
+
+    if (props.selectedConversationId) {
+        const conversation = props.conversations.find(c => c.id == props.selectedConversationId)
+        if (conversation) {
+            selectConversation(conversation)
+            return
+        }
+    }
+
     if (props.conversations.length > 0) {
         selectConversation(props.conversations[0])
     }
@@ -119,6 +129,14 @@ const selectConversation = (conversation) => {
     currentModel.value = conversation.model || props.selectedModel
     messageForm.conversation_id = conversation.id
     messageForm.model = conversation.model || props.selectedModel
+
+    //Change l'URL pour inclure l'ID
+    router.visit(`/ask?conversation=${conversation.id}`, {
+    preserveState: true,
+    preserveScroll: true,
+    only: []
+    })
+
     scrollToBottom()
     focusMessageInput()
     if (window.innerWidth < 768) {
@@ -313,7 +331,7 @@ watch(() => props.flash, (newFlash, oldFlash) => {
                     <!-- Lien Instructions mobile -->
                     <div class="md:hidden mb-4">
                         <a
-                            :href="route('instructions.edit')"
+                            :href="route('instructions.edit', { from_conversation: selectedConversation?.id })"
                             class="block p-3 rounded-lg text-gray-300 hover:bg-gray-800 transition-colors"
                             @click="isSidebarOpen = false"
                         >
@@ -323,7 +341,7 @@ watch(() => props.flash, (newFlash, oldFlash) => {
                             Instructions
                         </a>
                         <a
-                            :href="route('commands.edit')"
+                            :href="route('commands.edit', { from_conversation: selectedConversation?.id })"
                             class="block p-3 rounded-lg text-gray-300 hover:bg-gray-800 transition-colors"
                             @click="isSidebarOpen = false"
                         >
@@ -431,7 +449,7 @@ watch(() => props.flash, (newFlash, oldFlash) => {
                             class="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg z-50 border border-gray-200 dark:border-gray-700"
                         >
                             <a
-                                :href="route('instructions.edit')"
+                                :href="route('instructions.edit', { from_conversation: selectedConversation?.id })"
                                 class="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
                                 @click="showSettingsMenu = false"
                             >
@@ -441,7 +459,7 @@ watch(() => props.flash, (newFlash, oldFlash) => {
                                 Instructions
                             </a>
                             <a
-                                :href="route('commands.edit')"
+                                :href="route('commands.edit', { from_conversation: selectedConversation?.id })"
                                 class="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
                                 @click="showSettingsMenu = false"
                             >
