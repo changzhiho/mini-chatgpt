@@ -159,8 +159,19 @@ const deleteConversation = (conversationId) => {
 }
 
 const sendMessageWithStreaming = async () => {
-
     if (!messageForm.message.trim() || isStreaming.value) return
+
+    const userMessage = {
+        id: Date.now(),
+        role: 'user',
+        content: messageForm.message,
+        created_at: new Date().toISOString()
+    }
+
+    if (selectedConversation.value) {
+        selectedConversation.value.messages.push(userMessage)
+        scrollToBottom()
+    }
 
     isStreaming.value = true
     currentAIMessage.value = ''
@@ -192,24 +203,32 @@ const sendMessageWithStreaming = async () => {
 
             const chunk = decoder.decode(value, { stream: true })
 
-            // ✅ AFFICHAGE CARACTÈRE PAR CARACTÈRE comme ChatGPT
             for (let char of chunk) {
                 currentAIMessage.value += char
                 scrollToBottom()
-                // Petit délai pour effet de frappe
                 await new Promise(resolve => setTimeout(resolve, 20))
             }
         }
     } catch (error) {
         console.error('Erreur:', error)
         alert(`Erreur: ${error.message}`)
+
+        if (selectedConversation.value) {
+            selectedConversation.value.messages.pop()
+        }
     } finally {
         isStreaming.value = false
         messageForm.reset('message')
         focusMessageInput()
-        router.reload({ only: ['conversations'] })
+
+        router.reload({
+            only: ['conversations'],
+            preserveState: true,
+            preserveScroll: true
+        })
     }
 }
+
 
 
 const handleKeydown = (event) => {
@@ -480,31 +499,34 @@ watch(() => props.flash, (newFlash, oldFlash) => {
                         </svg>
                         <p class="text-lg">Commencez une nouvelle conversation</p>
                     </div>
-
-                    <div v-for="message in currentMessages" :key="message.id" class="flex">
+                    <div v-for="message in currentMessages" :key="message.id" :class="[
+                        'flex',
+                        message.role === 'user' ? 'justify-end' : 'justify-start'
+                    ]">
                         <div :class="[
-                            'max-w-3xl mx-auto w-full',
-                            message.role === 'user' ? 'bg-gray-50 dark:bg-gray-800' : 'bg-white dark:bg-gray-900'
+                            'flex p-4',
+                            message.role === 'user' ? 'bg-gray-50 dark:bg-gray-800 flex-row-reverse' : 'bg-white dark:bg-gray-900 flex-row',
+                            message.role === 'user' ? 'max-w-2xl' : 'max-w-3xl'
                         ]">
-                            <div class="flex p-4">
-                                <div class="flex-shrink-0 mr-4">
-                                    <div :class="[
-                                        'w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-medium',
-                                        message.role === 'user' ? 'bg-blue-500' : 'bg-green-500'
-                                    ]">
-                                        {{ message.role === 'user' ? 'U' : 'AI' }}
-                                    </div>
+                            <div :class="[
+                                'flex-shrink-0',
+                                message.role === 'user' ? 'ml-3' : 'mr-3'
+                            ]">
+                                <div :class="[
+                                    'w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-medium',
+                                    message.role === 'user' ? 'bg-blue-500' : 'bg-green-500'
+                                ]">
+                                    {{ message.role === 'user' ? 'U' : 'AI' }}
                                 </div>
-                                <div class="flex-1 min-w-0">
-                                    <div v-if="message.role === 'user'" class="prose dark:prose-invert max-w-none">
-                                        {{ message.content }}
-                                    </div>
-                                    <div v-else class="prose dark:prose-invert max-w-none prose-pre:bg-gray-800 prose-pre:text-gray-100" v-html="formatMarkdown(message.content)"></div>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <div v-if="message.role === 'user'" class="prose dark:prose-invert max-w-none">
+                                    {{ message.content }}
                                 </div>
+                                <div v-else class="prose dark:prose-invert max-w-none prose-pre:bg-gray-800 prose-pre:text-gray-100" v-html="formatMarkdown(message.content)"></div>
                             </div>
                         </div>
                     </div>
-
                     <!-- Message en cours de streaming -->
                     <div v-if="isStreaming" class="flex">
                         <div class="max-w-3xl mx-auto w-full bg-white dark:bg-gray-900">
