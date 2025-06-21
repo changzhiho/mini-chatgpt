@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use Illuminate\Support\Facades\Http;
+use GuzzleHttp\Client;
 
 class ChatService
 {
@@ -18,15 +19,6 @@ class ChatService
         $this->client = $this->createOpenAIClient();
     }
 
-    /**
-     * @return array<array-key, array{
-     *     id: string,
-     *     name: string,
-     *     context_length: int,
-     *     max_completion_tokens: int,
-     *     pricing: array{prompt: int, completion: int}
-     * }>
-     */
     public function getModels(): array
     {
         return cache()->remember('openai.models', now()->addHour(), function () {
@@ -46,30 +38,16 @@ class ChatService
                     ];
                 })
                 ->values()
-                ->all()
-            ;
+                ->all();
         });
     }
 
-    /**
-     * @param array{role: 'user'|'assistant'|'system'|'function', content: string} $messages
-     * @param string|null $model
-     * @param float $temperature
-     *
-     * @return string
-     */
     public function sendMessage(array $messages, string $model = null, float $temperature = 0.7): string
     {
         try {
-            logger()->info('Envoi du message', [
-                'model' => $model,
-                'temperature' => $temperature,
-            ]);
-
             $models = collect($this->getModels());
             if (!$model || !$models->contains('id', $model)) {
                 $model = self::DEFAULT_MODEL;
-                logger()->info('Modèle par défaut utilisé:', ['model' => $model]);
             }
 
             $messages = [$this->getChatSystemPrompt(), ...$messages];
@@ -79,18 +57,70 @@ class ChatService
                 'temperature' => $temperature,
             ]);
 
-            logger()->info('Réponse reçue:', ['response' => $response]);
-
-            $content = $response->choices[0]->message->content;
-
-            return $content;
+            return $response->choices[0]->message->content;
         } catch (\Exception $e) {
             logger()->error('Erreur dans sendMessage:', [
                 'message' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
-
             throw $e;
+        }
+    }
+
+    public function sendMessageStreamed(array $messages, string $model, callable $onChunk): void
+    {
+        $models = collect($this->getModels());
+        if (!$model || !$models->contains('id', $model)) {
+            $model = self::DEFAULT_MODEL;
+        }
+
+        $messages = [$this->getChatSystemPrompt(), ...$messages];
+
+        $url = $this->baseUrl . '/chat/completions';
+        $headers = [
+            'Authorization' => 'Bearer ' . $this->apiKey,
+            'Content-Type' => 'application/json',
+        ];
+        $body = [
+            'model' => $model,
+            'messages' => $messages,
+            'stream' => true,
+        ];
+
+        $guzzle = new Client();
+        $response = $guzzle->post($url, [
+            'headers' => $headers,
+            'json' => $body,
+            'stream' => true,
+        ]);
+
+        $stream = $response->getBody();
+        $buffer = '';
+
+        while (!$stream->eof()) {
+            $chunk = $stream->read(1024);
+            $buffer .= $chunk;
+
+            $lines = explode("\n", $buffer);
+            $buffer = array_pop($lines);
+
+            foreach ($lines as $line) {
+                $line = trim($line);
+                if (empty($line) || $line === 'data: [DONE]') {
+                    continue;
+                }
+                if (strpos($line, 'data: ') === 0) {
+                    $data = substr($line, 6);
+                    try {
+                        $decoded = json_decode($data, true);
+                        if (isset($decoded['choices'][0]['delta']['content'])) {
+                            $onChunk($decoded['choices'][0]['delta']['content']);
+                        }
+                    } catch (\Exception $e) {
+                        logger()->error('Erreur de parsing SSE:', ['line' => $line, 'error' => $e->getMessage()]);
+                    }
+                }
+            }
         }
     }
 
@@ -99,13 +129,9 @@ class ChatService
         return \OpenAI::factory()
             ->withApiKey($this->apiKey)
             ->withBaseUri($this->baseUrl)
-            ->make()
-        ;
+            ->make();
     }
 
-    /**
-     * @return array{role: 'system', content: string}
-     */
     private function getChatSystemPrompt(): array
     {
         $user = auth()->user();

@@ -6,6 +6,7 @@ const props = defineProps({
     instructions_about: String,
     instructions_how: String,
     success: String,
+    flash: Object,
 })
 
 const form = useForm({
