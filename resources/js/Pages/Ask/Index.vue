@@ -5,7 +5,6 @@ import AppLayout from '@/Layouts/AppLayout.vue'
 import MarkdownIt from 'markdown-it'
 import hljs from 'highlight.js'
 
-// Props reçues du contrôleur
 const props = defineProps({
     models: Array,
     selectedModel: String,
@@ -14,7 +13,6 @@ const props = defineProps({
     errors: Object,
 })
 
-// Configuration de markdown-it avec highlight.js
 let md = null
 
 onMounted(() => {
@@ -33,10 +31,7 @@ onMounted(() => {
             return '<pre class="hljs"><code>' + md.utils.escapeHtml(str) + '</code></pre>'
         }
     })
-
     initializeConversationSelection()
-
-    // Fermer le menu settings au clic extérieur
     document.addEventListener('click', closeSettingsMenu)
 })
 
@@ -44,32 +39,29 @@ onUnmounted(() => {
     document.removeEventListener('click', closeSettingsMenu)
 })
 
-// État réactif
 const selectedConversation = ref(null)
 const currentModel = ref(props.selectedModel)
 const messagesContainer = ref(null)
 const messageInput = ref(null)
 const isSidebarOpen = ref(false)
 const showSettingsMenu = ref(false)
+const isStreaming = ref(false)
+const currentAIMessage = ref('')
 
-// Formulaire Inertia pour envoyer des messages
 const messageForm = useForm({
     message: '',
     conversation_id: null,
     model: props.selectedModel
 })
 
-// Formulaire pour créer une conversation
 const conversationForm = useForm({
     model: props.selectedModel
 })
 
-// Messages de la conversation actuelle
 const currentMessages = computed(() => {
     return selectedConversation.value?.messages || []
 })
 
-// Fonction pour initialiser la sélection de conversation
 const initializeConversationSelection = () => {
     if (props.flash?.selectedConversationId) {
         const conversation = props.conversations.find(c => c.id === props.flash.selectedConversationId)
@@ -86,18 +78,15 @@ const initializeConversationSelection = () => {
     }
 }
 
-// Fermer le menu settings
 const closeSettingsMenu = () => {
     showSettingsMenu.value = false
 }
 
-// Rendu du markdown
 const formatMarkdown = (content) => {
     if (!md) return content
     return md.render(content)
 }
 
-// Formatage des dates
 const formatDate = (dateString) => {
     const date = new Date(dateString)
     const now = new Date()
@@ -109,7 +98,6 @@ const formatDate = (dateString) => {
     return date.toLocaleDateString('fr-FR')
 }
 
-// Scroll vers le bas
 const scrollToBottom = () => {
     nextTick(() => {
         if (messagesContainer.value) {
@@ -118,7 +106,6 @@ const scrollToBottom = () => {
     })
 }
 
-// Focus automatique sur l'input
 const focusMessageInput = () => {
     nextTick(() => {
         if (messageInput.value) {
@@ -127,7 +114,6 @@ const focusMessageInput = () => {
     })
 }
 
-// Sélectionner une conversation
 const selectConversation = (conversation) => {
     selectedConversation.value = conversation
     currentModel.value = conversation.model || props.selectedModel
@@ -135,24 +121,18 @@ const selectConversation = (conversation) => {
     messageForm.model = conversation.model || props.selectedModel
     scrollToBottom()
     focusMessageInput()
-    // Ferme le menu sur mobile après sélection
     if (window.innerWidth < 768) {
         isSidebarOpen.value = false
     }
 }
 
-// Créer une nouvelle conversation
 const createNewConversation = () => {
     conversationForm.model = currentModel.value
     conversationForm.post(route('ask.new'), {
         preserveScroll: true,
-        onSuccess: () => {
-            // La sélection automatique se fera via le watcher du flash
-        }
     })
 }
 
-// Supprimer une conversation
 const deleteConversation = (conversationId) => {
     if (!confirm('Êtes-vous sûr de vouloir supprimer cette conversation ?')) return
     router.delete(route('ask.delete', conversationId), {
@@ -160,90 +140,106 @@ const deleteConversation = (conversationId) => {
     })
 }
 
-// Envoyer un message
-const sendMessage = () => {
-    if (!messageForm.message.trim() || messageForm.processing) return
-    messageForm.model = currentModel.value
-    messageForm.post(route('ask.post'), {
-        preserveScroll: true,
-        onSuccess: () => {
-            messageForm.reset('message')
-            scrollToBottom()
-            focusMessageInput()
-        },
-        onError: () => {
-            focusMessageInput()
-        }
-    })
-}
+const sendMessageWithStreaming = async () => {
 
-// Gérer les raccourcis clavier
-const handleKeydown = (event) => {
-    if (event.key === 'Enter' && !event.shiftKey) {
-        event.preventDefault()
-        sendMessage()
+    if (!messageForm.message.trim() || isStreaming.value) return
+
+    isStreaming.value = true
+    currentAIMessage.value = ''
+
+    try {
+        const response = await fetch(route('ask.post'), {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+            },
+            body: JSON.stringify({
+                message: messageForm.message,
+                model: currentModel.value,
+                conversation_id: selectedConversation.value?.id,
+            }),
+        })
+
+        if (!response.ok) {
+            throw new Error(`Erreur: ${response.status}`)
+        }
+
+        const reader = response.body.getReader()
+        const decoder = new TextDecoder()
+
+        while (true) {
+            const { done, value } = await reader.read()
+            if (done) break
+
+            const chunk = decoder.decode(value, { stream: true })
+
+            // ✅ AFFICHAGE CARACTÈRE PAR CARACTÈRE comme ChatGPT
+            for (let char of chunk) {
+                currentAIMessage.value += char
+                scrollToBottom()
+                // Petit délai pour effet de frappe
+                await new Promise(resolve => setTimeout(resolve, 20))
+            }
+        }
+    } catch (error) {
+        console.error('Erreur:', error)
+        alert(`Erreur: ${error.message}`)
+    } finally {
+        isStreaming.value = false
+        messageForm.reset('message')
+        focusMessageInput()
+        router.reload({ only: ['conversations'] })
     }
 }
 
-// Partage de conversations
+
+const handleKeydown = (event) => {
+    if (event.key === 'Enter' && !event.shiftKey) {
+        event.preventDefault()
+        sendMessageWithStreaming()
+    }
+}
+
 const shareConversation = (conversation) => {
     router.post(`/ask/${conversation.id}/share`, {}, {
         preserveScroll: true,
         onSuccess: (page) => {
             const shareUrl = page.props.flash?.share_url
             if (shareUrl && page.props.flash?.share_success) {
-                // Copier l'URL dans le presse-papier
                 if (navigator.clipboard && navigator.clipboard.writeText) {
                     navigator.clipboard.writeText(shareUrl)
-                        .then(() => {
-                            alert('Lien de partage copié dans le presse-papier !')
-                        })
-                        .catch(err => {
-                            console.error('Erreur lors de la copie:', err)
-                            // Fallback si la copie échoue
-                            prompt('Copiez ce lien de partage:', shareUrl)
-                        })
+                        .then(() => alert('Lien copié !'))
+                        .catch(() => prompt('Copiez ce lien:', shareUrl))
                 } else {
-                    // Fallback pour les navigateurs plus anciens
-                    prompt('Copiez ce lien de partage:', shareUrl)
+                    prompt('Copiez ce lien:', shareUrl)
                 }
             }
-        },
-        onError: (errors) => {
-            console.error('Erreurs:', errors)
-            alert('Erreur lors de la génération du lien de partage')
         }
     })
 }
 
-// Watcher pour mettre à jour le modèle
 watch(currentModel, (newModel) => {
     messageForm.model = newModel
     conversationForm.model = newModel
 })
 
-// Watcher pour détecter les changements de conversations
 watch(() => props.conversations, (newConversations) => {
     if (selectedConversation.value) {
         const updatedConversation = newConversations.find(c => c.id === selectedConversation.value.id)
         if (updatedConversation) {
             selectedConversation.value = updatedConversation
-            nextTick(() => {
-                scrollToBottom()
-            })
+            nextTick(() => scrollToBottom())
         }
     }
 }, { deep: true })
 
-// Watcher pour réinitialiser la sélection quand les conversations changent (après création/suppression)
 watch(() => props.conversations, (newConversations, oldConversations) => {
-    // Si le nombre de conversations a changé, réinitialiser la sélection
     if (newConversations.length !== oldConversations?.length) {
         initializeConversationSelection()
     }
 }, { immediate: false })
 
-// Watcher pour la sélection automatique de nouvelle conversation
 watch(() => props.flash, (newFlash, oldFlash) => {
     if (newFlash?.selectedConversationId && newFlash.selectedConversationId !== oldFlash?.selectedConversationId) {
         const conversation = props.conversations.find(c => c.id === newFlash.selectedConversationId)
@@ -256,7 +252,6 @@ watch(() => props.flash, (newFlash, oldFlash) => {
     }
 }, { deep: true })
 </script>
-
 
 <template>
     <AppLayout title="Ask AI">
@@ -287,8 +282,7 @@ watch(() => props.flash, (newFlash, oldFlash) => {
                         </svg>
                         <svg v-else class="w-4 h-4 mr-2 animate-spin" fill="none" viewBox="0 0 24 24">
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>                        </svg>
                         <span class="hidden sm:inline">Nouvelle conversation</span>
                         <span class="sm:hidden">Nouveau</span>
                     </button>
@@ -451,9 +445,9 @@ watch(() => props.flash, (newFlash, oldFlash) => {
                                 class="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
                                 @click="showSettingsMenu = false"
                             >
-                                    <svg class="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg class="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                                    </svg>
+                                </svg>
                                 Commandes
                             </a>
                         </div>
@@ -493,8 +487,8 @@ watch(() => props.flash, (newFlash, oldFlash) => {
                         </div>
                     </div>
 
-                    <!-- Loading indicator -->
-                    <div v-if="messageForm.processing" class="flex">
+                    <!-- Message en cours de streaming -->
+                    <div v-if="isStreaming" class="flex">
                         <div class="max-w-3xl mx-auto w-full bg-white dark:bg-gray-900">
                             <div class="flex p-4">
                                 <div class="flex-shrink-0 mr-4">
@@ -503,14 +497,7 @@ watch(() => props.flash, (newFlash, oldFlash) => {
                                     </div>
                                 </div>
                                 <div class="flex-1 min-w-0">
-                                    <div class="flex items-center space-x-2">
-                                        <div class="animate-pulse flex space-x-1">
-                                            <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                                            <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0.1s"></div>
-                                            <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0.2s"></div>
-                                        </div>
-                                        <span class="text-gray-500 text-sm">L'IA réfléchit...</span>
-                                    </div>
+                                    <div class="prose dark:prose-invert max-w-none prose-pre:bg-gray-800 prose-pre:text-gray-100" v-html="formatMarkdown(currentAIMessage)"></div>
                                 </div>
                             </div>
                         </div>
@@ -535,13 +522,13 @@ watch(() => props.flash, (newFlash, oldFlash) => {
 
                 <!-- Input Area -->
                 <div class="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 p-4">
-                    <form @submit.prevent="sendMessage" class="max-w-3xl mx-auto">
+                    <form @submit.prevent="sendMessageWithStreaming" class="max-w-3xl mx-auto">
                         <div class="flex space-x-4">
                             <div class="flex-1">
                                 <textarea
                                     ref="messageInput"
                                     v-model="messageForm.message"
-                                    :disabled="messageForm.processing"
+                                    :disabled="isStreaming"
                                     @keydown="handleKeydown"
                                     placeholder="Tapez votre message... (Entrée pour envoyer, Shift+Entrée pour nouvelle ligne)"
                                     class="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white resize-none"
@@ -550,17 +537,15 @@ watch(() => props.flash, (newFlash, oldFlash) => {
                             </div>
                             <button
                                 type="submit"
-                                :disabled="!messageForm.message.trim() || messageForm.processing"
+                                :disabled="!messageForm.message.trim() || isStreaming"
                                 class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                             >
-                                <svg v-if="!messageForm.processing" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg v-if="!isStreaming" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
                                 </svg>
                                 <svg v-else class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
                                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 0 1 4 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-
-                                </svg>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>                                </svg>
                             </button>
                         </div>
                     </form>
@@ -572,10 +557,8 @@ watch(() => props.flash, (newFlash, oldFlash) => {
 
 
 <style>
-/* Import des styles highlight.js */
 @import 'highlight.js/styles/github-dark.css';
 
-/* Styles personnalisés pour le code */
 .prose pre {
     @apply bg-gray-800 text-gray-100 rounded-lg;
 }

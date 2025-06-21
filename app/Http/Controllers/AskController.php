@@ -8,7 +8,6 @@ use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
 use App\Models\Conversation;
 use App\Models\Message;
-use League\Uri\IPv4\Converter;
 
 class AskController extends Controller
 {
@@ -66,76 +65,82 @@ class AskController extends Controller
             'content' => $request->message
         ]);
 
-        try {
-            // Préparer le message système avec les instructions personnalisées
-            $systemMessages = [];
-            if ($user->instructions_about || $user->instructions_how) {
-                $instructions = "Instructions personnalisées de l'utilisateur :\n";
-                if ($user->instructions_about) {
-                    $instructions .= "À propos de l'utilisateur : " . $user->instructions_about . "\n";
-                }
-                if ($user->instructions_how) {
-                    $instructions .= "Style de réponse souhaité : " . $user->instructions_how . "\n";
-                }
-                $systemMessages[] = [
-                    'role' => 'system',
-                    'content' => $instructions
-                ];
+        // Préparer le message système avec les instructions personnalisées
+        $systemMessages = [];
+        if ($user->instructions_about || $user->instructions_how) {
+            $instructions = "Instructions personnalisées de l'utilisateur :\n";
+            if ($user->instructions_about) {
+                $instructions .= "À propos de l'utilisateur : " . $user->instructions_about . "\n";
             }
+            if ($user->instructions_how) {
+                $instructions .= "Style de réponse souhaité : " . $user->instructions_how . "\n";
+            }
+            $systemMessages[] = [
+                'role' => 'system',
+                'content' => $instructions
+            ];
+        }
 
-            // Préparer tous les messages de la conversation pour l'API
-            $userMessages = $conversation->messages()
-                ->orderBy('created_at', 'asc')
-                ->get()
-                ->map(function ($message) use ($processedMessage, $request) {
-                    // Remplacer le dernier message par la version traitée
-                    if ($message->content === $request->message && $message->role === 'user') {
-                        return [
-                            'role' => $message->role,
-                            'content' => $processedMessage
-                        ];
-                    }
+        // Préparer tous les messages de la conversation pour l'API
+        $userMessages = $conversation->messages()
+            ->orderBy('created_at', 'asc')
+            ->get()
+            ->map(function ($message) use ($processedMessage, $request) {
+                if ($message->content === $request->message && $message->role === 'user') {
                     return [
                         'role' => $message->role,
-                        'content' => $message->content
+                        'content' => $processedMessage
                     ];
-                })
-                ->toArray();
+                }
+                return [
+                    'role' => $message->role,
+                    'content' => $message->content
+                ];
+            })
+            ->toArray();
 
-            // Fusionner instructions système et messages de la conversation
-            $finalMessages = array_merge($systemMessages, $userMessages);
+        $finalMessages = array_merge($systemMessages, $userMessages);
 
-            // Utiliser votre ChatService existant
-            $response = (new ChatService())->sendMessage(
+        return response()->stream(function () use ($conversation, $finalMessages, $request, $user) {
+            $fullResponse = '';
+
+            (new ChatService())->sendMessageStreamed(
                 messages: $finalMessages,
-                model: $request->model
+                model: $request->model,
+                onChunk: function ($content) use (&$fullResponse) {
+                    $fullResponse .= $content;
+
+                    // ✅ STREAMING FLUIDE comme ChatGPT
+                    echo $content;
+                    if (ob_get_level()) {
+                        ob_flush();
+                    }
+                    flush();
+
+                    // ✅ PETIT DÉLAI pour fluidité
+                    usleep(10000); // 10ms
+                }
             );
 
-            // Sauvegarder la réponse de l'IA
-            $aiMessage = Message::create([
+            // Sauvegarder le message final
+            Message::create([
                 'conversation_id' => $conversation->id,
                 'role' => 'assistant',
-                'content' => $response
+                'content' => $fullResponse
             ]);
 
-            // Générer un titre si c'est le premier échange
             if ($conversation->messages()->count() === 2 && $conversation->title === 'Nouvelle conversation') {
-                $this->generateConversationTitle($conversation, $request->message, $response);
+                $this->generateConversationTitle($conversation, $request->message, $fullResponse);
             }
 
             $conversation->touch();
-
-            return redirect()->back()->with([
-                'selectedConversationId' => $conversation->id,
-                'shouldFocusInput' => true
-            ]);
-        } catch (\Exception $e) {
-            return redirect()->back()->withErrors([
-                'message' => 'Erreur: ' . $e->getMessage()
-            ]);
-        }
+        }, 200, [
+            'Content-Type' => 'text/plain; charset=utf-8',
+            'Cache-Control' => 'no-cache',
+            'X-Accel-Buffering' => 'no',
+            'Connection' => 'keep-alive',
+        ]);
     }
-
 
     public function createConversation(Request $request)
     {
@@ -158,7 +163,6 @@ class AskController extends Controller
         $conversation = Conversation::where('user_id', Auth::id())->findOrFail($id);
         $conversation->delete();
 
-        // Sélectionner la première conversation restante
         $nextConversation = Conversation::where('user_id', Auth::id())
             ->orderBy('updated_at', 'desc')
             ->first();
@@ -166,6 +170,19 @@ class AskController extends Controller
         return redirect()->route('ask.index')->with([
             'selectedConversationId' => $nextConversation?->id,
             'shouldFocusInput' => true
+        ]);
+    }
+
+    public function share($id)
+    {
+        $conversation = Conversation::find($id);
+        if ($conversation->user_id !== Auth::id()) {
+            abort(403, 'Vous n\'êtes pas autorisé à partager cette conversation.');
+        }
+
+        return redirect()->back()->with([
+            'share_url' => route('conversation.share', $conversation->uuid),
+            'share_success' => true
         ]);
     }
 
@@ -179,7 +196,7 @@ class AskController extends Controller
                 ],
                 [
                     'role' => 'user',
-                    $content = 'content' => $userMessage
+                    'content' => $userMessage
                 ],
                 [
                     'role' => 'assistant',
@@ -202,46 +219,25 @@ class AskController extends Controller
         }
     }
 
-    public function share($id)
-    {
-        $conversation = Conversation::find($id);
-        if ($conversation->user_id !== Auth::id()) {
-            abort(403, 'Vous n\'êtes pas autorisé à partager cette conversation.');
-        }
-
-        return redirect()->back()->with([
-            'share_url' => route('conversation.share', $conversation->uuid),
-            'share_success' => true
-        ]);
-    }
-
     private function processCustomCommands($message, $user)
     {
-        // Si pas de commandes personnalisées, retourner le message original
         if (!$user->custom_commands) {
             return $message;
         }
 
-        // Parser les commandes personnalisées
         $commands = $this->parseCustomCommands($user->custom_commands);
 
-        // Vérifier si le message commence par une commande
         foreach ($commands as $command => $description) {
             if (strpos(trim($message), $command) === 0) {
-                // Extraire les arguments après la commande
                 $args = trim(substr($message, strlen($command)));
-
-                // Construire le message pour l'IA
                 $processedMessage = $description;
                 if ($args) {
                     $processedMessage .= " " . $args;
                 }
-
                 return $processedMessage;
             }
         }
 
-        // Si aucune commande trouvée, retourner le message original
         return $message;
     }
 
@@ -254,7 +250,6 @@ class AskController extends Controller
             $line = trim($line);
             if (empty($line)) continue;
 
-            // Format attendu: "/commande: description"
             if (preg_match('/^(\/\w+)\s*:\s*(.+)$/', $line, $matches)) {
                 $command = trim($matches[1]);
                 $description = trim($matches[2]);
