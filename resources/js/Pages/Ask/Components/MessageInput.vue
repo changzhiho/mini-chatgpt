@@ -38,7 +38,7 @@ defineExpose({
                         v-model="messageForm.message"
                         :disabled="isStreaming || !selectedConversation"
                         @keydown="emit('keydown', $event)"
-                        placeholder="Tapez votre message... (Entrée pour envoyer, Shift+Entrée pour nouvelle ligne)"
+                        placeholder="Tapez votre message"
                         class="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white resize-none"
                         rows="1"
                     ></textarea>
