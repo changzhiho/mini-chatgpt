@@ -12,6 +12,8 @@ use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
 use Laravel\Fortify\Fortify;
+use App\Http\Responses\LogoutResponse;
+use Laravel\Fortify\Contracts\LogoutResponse as LogoutResponseContract;
 
 class FortifyServiceProvider extends ServiceProvider
 {
@@ -44,5 +46,7 @@ class FortifyServiceProvider extends ServiceProvider
         });
 
         Fortify::redirects('login', '/ask');
+
+        $this->app->singleton(LogoutResponseContract::class, LogoutResponse::class);
     }
 }

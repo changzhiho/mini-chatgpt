@@ -1,5 +1,5 @@
 <script setup>
-import { Head, Link, useForm } from '@inertiajs/vue3';
+import { Head, Link, useForm, usePage } from '@inertiajs/vue3';
 import AuthenticationCard from '@/Components/AuthenticationCard.vue';
 import AuthenticationCardLogo from '@/Components/AuthenticationCardLogo.vue';
 import Checkbox from '@/Components/Checkbox.vue';
@@ -27,6 +27,13 @@ const submit = () => {
         onFinish: () => form.reset('password'),
     });
 };
+
+const logoutMessage = usePage().props.flash?.logout_message
+
+if (logoutMessage) {
+    alert(logoutMessage)
+}
+
 </script>
 
 <template>

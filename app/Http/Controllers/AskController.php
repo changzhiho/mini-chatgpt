@@ -11,7 +11,7 @@ use App\Models\Message;
 
 class AskController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
         $models = (new ChatService())->getModels();
         $selectedModel = Auth::user()->preferred_model ?? ChatService::DEFAULT_MODEL;
@@ -23,10 +23,14 @@ class AskController extends Controller
             }])
             ->get();
 
+        //Récupère l'ID de conversation depuis le flash ou l'URL
+        $selectedConversationId = session('selectedConversationId') ?? $request->get('conversation');
+
         return Inertia::render('Ask/Index', [
             'models' => $models,
             'selectedModel' => $selectedModel,
             'conversations' => $conversations,
+            'selectedConversationId' => $selectedConversationId,
         ]);
     }
 
@@ -110,14 +114,12 @@ class AskController extends Controller
                 onChunk: function ($content) use (&$fullResponse) {
                     $fullResponse .= $content;
 
-                    // ✅ STREAMING FLUIDE comme ChatGPT
                     echo $content;
                     if (ob_get_level()) {
                         ob_flush();
                     }
                     flush();
 
-                    // ✅ PETIT DÉLAI pour fluidité
                     usleep(10000); // 10ms
                 }
             );
@@ -221,6 +223,26 @@ class AskController extends Controller
 
     private function processCustomCommands($message, $user)
     {
+        if (strpos(trim($message), '/meteo') === 0) {
+            $city = trim(substr($message, 6));
+            if (empty($city)) {
+                return "Veuillez spécifier une ville. Exemple: /meteo Paris";
+            }
+
+            $weatherService = new \App\Services\WeatherService();
+            $weather = $weatherService->getCurrentWeather($city);
+
+            if (isset($weather['error'])) {
+                return "Erreur météo: " . $weather['error'];
+            }
+
+            $temp = $weather['main']['temp'] ?? 'N/A';
+            $description = $weather['weather'][0]['description'] ?? 'N/A';
+            $humidity = $weather['main']['humidity'] ?? 'N/A';
+
+            return "Météo actuelle à {$city}: {$temp}°C, {$description}, humidité {$humidity}%. Présente ces informations de manière naturelle.";
+        }
+
         if (!$user->custom_commands) {
             return $message;
         }

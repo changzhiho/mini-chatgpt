@@ -4,11 +4,13 @@ import { useForm, router } from '@inertiajs/vue3'
 import AppLayout from '@/Layouts/AppLayout.vue'
 import MarkdownIt from 'markdown-it'
 import hljs from 'highlight.js'
+import CopyMessageIcon from '@/Pages/Chat/CopyMessageIcon.vue'
 
 const props = defineProps({
     models: Array,
     selectedModel: String,
     conversations: Array,
+    selectedConversationId: [String, Number],
     flash: Object,
     errors: Object,
 })
@@ -73,6 +75,15 @@ const initializeConversationSelection = () => {
             return
         }
     }
+
+    if (props.selectedConversationId) {
+        const conversation = props.conversations.find(c => c.id == props.selectedConversationId)
+        if (conversation) {
+            selectConversation(conversation)
+            return
+        }
+    }
+
     if (props.conversations.length > 0) {
         selectConversation(props.conversations[0])
     }
@@ -119,6 +130,14 @@ const selectConversation = (conversation) => {
     currentModel.value = conversation.model || props.selectedModel
     messageForm.conversation_id = conversation.id
     messageForm.model = conversation.model || props.selectedModel
+
+    //Change l'URL pour inclure l'ID
+    router.visit(`/ask?conversation=${conversation.id}`, {
+    preserveState: true,
+    preserveScroll: true,
+    only: []
+    })
+
     scrollToBottom()
     focusMessageInput()
     if (window.innerWidth < 768) {
@@ -141,8 +160,19 @@ const deleteConversation = (conversationId) => {
 }
 
 const sendMessageWithStreaming = async () => {
-
     if (!messageForm.message.trim() || isStreaming.value) return
+
+    const userMessage = {
+        id: Date.now(),
+        role: 'user',
+        content: messageForm.message,
+        created_at: new Date().toISOString()
+    }
+
+    if (selectedConversation.value) {
+        selectedConversation.value.messages.push(userMessage)
+        scrollToBottom()
+    }
 
     isStreaming.value = true
     currentAIMessage.value = ''
@@ -174,24 +204,32 @@ const sendMessageWithStreaming = async () => {
 
             const chunk = decoder.decode(value, { stream: true })
 
-            // ✅ AFFICHAGE CARACTÈRE PAR CARACTÈRE comme ChatGPT
             for (let char of chunk) {
                 currentAIMessage.value += char
                 scrollToBottom()
-                // Petit délai pour effet de frappe
                 await new Promise(resolve => setTimeout(resolve, 20))
             }
         }
     } catch (error) {
         console.error('Erreur:', error)
         alert(`Erreur: ${error.message}`)
+
+        if (selectedConversation.value) {
+            selectedConversation.value.messages.pop()
+        }
     } finally {
         isStreaming.value = false
         messageForm.reset('message')
         focusMessageInput()
-        router.reload({ only: ['conversations'] })
+
+        router.reload({
+            only: ['conversations'],
+            preserveState: true,
+            preserveScroll: true
+        })
     }
 }
+
 
 
 const handleKeydown = (event) => {
@@ -313,7 +351,7 @@ watch(() => props.flash, (newFlash, oldFlash) => {
                     <!-- Lien Instructions mobile -->
                     <div class="md:hidden mb-4">
                         <a
-                            :href="route('instructions.edit')"
+                            :href="route('instructions.edit', { from_conversation: selectedConversation?.id })"
                             class="block p-3 rounded-lg text-gray-300 hover:bg-gray-800 transition-colors"
                             @click="isSidebarOpen = false"
                         >
@@ -323,7 +361,7 @@ watch(() => props.flash, (newFlash, oldFlash) => {
                             Instructions
                         </a>
                         <a
-                            :href="route('commands.edit')"
+                            :href="route('commands.edit', { from_conversation: selectedConversation?.id })"
                             class="block p-3 rounded-lg text-gray-300 hover:bg-gray-800 transition-colors"
                             @click="isSidebarOpen = false"
                         >
@@ -431,7 +469,7 @@ watch(() => props.flash, (newFlash, oldFlash) => {
                             class="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg z-50 border border-gray-200 dark:border-gray-700"
                         >
                             <a
-                                :href="route('instructions.edit')"
+                                :href="route('instructions.edit', { from_conversation: selectedConversation?.id })"
                                 class="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
                                 @click="showSettingsMenu = false"
                             >
@@ -441,7 +479,7 @@ watch(() => props.flash, (newFlash, oldFlash) => {
                                 Instructions
                             </a>
                             <a
-                                :href="route('commands.edit')"
+                                :href="route('commands.edit', { from_conversation: selectedConversation?.id })"
                                 class="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
                                 @click="showSettingsMenu = false"
                             >
@@ -453,7 +491,6 @@ watch(() => props.flash, (newFlash, oldFlash) => {
                         </div>
                     </div>
                 </div>
-
                 <!-- Messages -->
                 <div ref="messagesContainer" class="flex-1 overflow-y-auto p-4 space-y-4">
                     <div v-if="!selectedConversation" class="text-center text-gray-500 mt-20">
@@ -462,31 +499,40 @@ watch(() => props.flash, (newFlash, oldFlash) => {
                         </svg>
                         <p class="text-lg">Commencez une nouvelle conversation</p>
                     </div>
-
-                    <div v-for="message in currentMessages" :key="message.id" class="flex">
-                        <div :class="[
-                            'max-w-3xl mx-auto w-full',
-                            message.role === 'user' ? 'bg-gray-50 dark:bg-gray-800' : 'bg-white dark:bg-gray-900'
+                    <div v-for="message in currentMessages" :key="message.id" :class="[
+                            'flex',
+                            message.role === 'user' ? 'justify-end' : 'justify-start'
                         ]">
-                            <div class="flex p-4">
-                                <div class="flex-shrink-0 mr-4">
+                            <CopyMessageIcon
+                                :message="message.content"
+                                :align-right="message.role === 'user'"
+                                :always-visible="message.role !== 'user'"
+                            >
+                                <div :class="[
+                                    'flex p-4',
+                                    message.role === 'user' ? 'bg-gray-50 dark:bg-gray-800 flex-row-reverse' : 'bg-white dark:bg-gray-900 flex-row',
+                                    message.role === 'user' ? 'max-w-2xl' : 'max-w-3xl'
+                                ]">
                                     <div :class="[
-                                        'w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-medium',
-                                        message.role === 'user' ? 'bg-blue-500' : 'bg-green-500'
+                                        'flex-shrink-0',
+                                        message.role === 'user' ? 'ml-3' : 'mr-3'
                                     ]">
-                                        {{ message.role === 'user' ? 'U' : 'AI' }}
+                                        <div :class="[
+                                            'w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-medium',
+                                            message.role === 'user' ? 'bg-blue-500' : 'bg-green-500'
+                                        ]">
+                                            {{ message.role === 'user' ? 'U' : 'AI' }}
+                                        </div>
+                                    </div>
+                                    <div class="flex-1 min-w-0">
+                                        <div v-if="message.role === 'user'" class="prose dark:prose-invert max-w-none">
+                                            {{ message.content }}
+                                        </div>
+                                        <div v-else class="prose dark:prose-invert max-w-none prose-pre:bg-gray-800 prose-pre:text-gray-100" v-html="formatMarkdown(message.content)"></div>
                                     </div>
                                 </div>
-                                <div class="flex-1 min-w-0">
-                                    <div v-if="message.role === 'user'" class="prose dark:prose-invert max-w-none">
-                                        {{ message.content }}
-                                    </div>
-                                    <div v-else class="prose dark:prose-invert max-w-none prose-pre:bg-gray-800 prose-pre:text-gray-100" v-html="formatMarkdown(message.content)"></div>
-                                </div>
-                            </div>
+                            </CopyMessageIcon>
                         </div>
-                    </div>
-
                     <!-- Message en cours de streaming -->
                     <div v-if="isStreaming" class="flex">
                         <div class="max-w-3xl mx-auto w-full bg-white dark:bg-gray-900">

@@ -7,11 +7,13 @@ const props = defineProps({
     instructions_how: String,
     success: String,
     flash: Object,
+    from_conversation: String,
 })
 
 const form = useForm({
     instructions_about: props.instructions_about || '',
     instructions_how: props.instructions_how || '',
+    from_conversation: props.from_conversation,
 })
 
 const submit = () => {

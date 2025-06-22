@@ -40,4 +40,8 @@ return [
         'api_key' => env('OPENROUTER_API_KEY'),
     ],
 
+    'weather' => [
+        'api_key' => env('WEATHER_API_KEY'),
+    ],
+
 ];
