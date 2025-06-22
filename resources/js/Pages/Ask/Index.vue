@@ -203,17 +203,26 @@ const sendMessageWithStreaming = async () => {
 
         const reader = response.body.getReader()
         const decoder = new TextDecoder()
+        let fullResponse = ''
 
         while (true) {
             const { done, value } = await reader.read()
             if (done) break
 
             const chunk = decoder.decode(value, { stream: true })
+            fullResponse += chunk
+            currentAIMessage.value += chunk
+            await new Promise(resolve => setTimeout(resolve, 20))
+        }
 
-            for (let char of chunk) {
-                currentAIMessage.value += char
-                await new Promise(resolve => setTimeout(resolve, 20))
-            }
+        // ✅ Ajouter le message final à la conversation
+        if (selectedConversation.value) {
+            selectedConversation.value.messages.push({
+                id: Date.now() + 1,
+                role: 'assistant',
+                content: fullResponse,
+                created_at: new Date().toISOString()
+            })
         }
     } catch (error) {
         console.error('Erreur:', error)
@@ -226,14 +235,9 @@ const sendMessageWithStreaming = async () => {
         isStreaming.value = false
         messageForm.reset('message')
         focusMessageInput()
-
-        router.reload({
-            only: ['conversations'],
-            preserveState: true,
-            preserveScroll: true // ✅ Préserver le scroll
-        })
     }
 }
+
 
 const handleKeydown = (event) => {
     if (event.key === 'Enter' && !event.shiftKey) {
@@ -339,6 +343,7 @@ watch(() => props.flash, (newFlash, oldFlash) => {
                     :selectedConversation="selectedConversation"
                     :isStreaming="isStreaming"
                     :currentAIMessage="formatMarkdown(currentAIMessage)"
+                    :formatMarkdown="formatMarkdown"
                 />
 
                 <ErrorDisplay :error="errors?.message" />
