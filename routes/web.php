@@ -8,6 +8,10 @@ use App\Http\Controllers\AskController;
 use App\Http\Controllers\SharedConversationController;
 use App\Http\Controllers\CommandsController;
 
+Route::get('/', function () {
+    return redirect('/ask');
+});
+
 Route::get('shared/{conversation}', [SharedConversationController::class, 'show'])->name('conversation.share');
 
 Route::middleware([
@@ -20,6 +24,7 @@ Route::middleware([
     })->name('dashboard');
 
     // Routes chat
+
     Route::get('ask', [AskController::class, 'index'])->name('ask.index');
     Route::post('ask', [AskController::class, 'ask'])->name('ask.post');
     Route::post('ask/new', [AskController::class, 'createConversation'])->name('ask.new');
