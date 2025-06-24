@@ -167,76 +167,92 @@ const deleteConversation = (conversationId) => {
 }
 
 const sendMessageWithStreaming = async () => {
-    if (!messageForm.message.trim() || isStreaming.value) return
+  if (!messageForm.message.trim() || isStreaming.value) return
 
-    const userMessage = {
-        id: Date.now(),
-        role: 'user',
-        content: messageForm.message,
-        created_at: new Date().toISOString()
+  if (selectedConversation.value) {
+    selectedConversation.value.messages.push({
+      id: Date.now(),
+      role: 'user',
+      content: messageForm.message,
+      created_at: new Date().toISOString()
+    })
+  }
+
+  isStreaming.value = true
+  currentAIMessage.value = ''
+
+  try {
+    const response = await fetch(route('ask.post'), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+      },
+      body: JSON.stringify({
+        message: messageForm.message,
+        model: currentModel.value,
+        conversation_id: selectedConversation.value?.id
+      })
+    })
+
+    if (!response.ok) throw new Error(`Erreur: ${response.status}`)
+
+    const reader = response.body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ''
+    let messageComplete = false
+
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+
+      buffer += decoder.decode(value, { stream: true })
+
+      if (buffer.includes('__MESSAGE_END__')) {
+        messageComplete = true
+        buffer = buffer.replace('__MESSAGE_END__', '')
+      }
+
+      if (messageComplete && buffer.includes('__TITLE_START__') && buffer.includes('__TITLE_END__')) {
+        const titleJson = buffer.match(/__TITLE_START__\n(.*?)\n__TITLE_END__/s)
+        if (titleJson) {
+          const titleData = JSON.parse(titleJson[1])
+          if (selectedConversation.value?.id === titleData.conversation_id) {
+            selectedConversation.value.title = titleData.title
+          }
+          const idx = props.conversations.findIndex(c => c.id === titleData.conversation_id)
+          if (idx !== -1) props.conversations[idx].title = titleData.title
+        }
+        buffer = ''
+      }
+
+      if (!messageComplete) {
+        currentAIMessage.value += buffer
+        buffer = ''
+        await new Promise(r => setTimeout(r, 20))
+      }
     }
 
     if (selectedConversation.value) {
-        selectedConversation.value.messages.push(userMessage)
+      selectedConversation.value.messages.push({
+        id: Date.now() + 1,
+        role: 'assistant',
+        content: currentAIMessage.value,
+        created_at: new Date().toISOString()
+      })
     }
-
-    isStreaming.value = true
-    currentAIMessage.value = ''
-
-    try {
-        const response = await fetch(route('ask.post'), {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
-            },
-            body: JSON.stringify({
-                message: messageForm.message,
-                model: currentModel.value,
-                conversation_id: selectedConversation.value?.id,
-            }),
-        })
-
-        if (!response.ok) {
-            throw new Error(`Erreur: ${response.status}`)
-        }
-
-        const reader = response.body.getReader()
-        const decoder = new TextDecoder()
-        let fullResponse = ''
-
-        while (true) {
-            const { done, value } = await reader.read()
-            if (done) break
-
-            const chunk = decoder.decode(value, { stream: true })
-            fullResponse += chunk
-            currentAIMessage.value += chunk
-            await new Promise(resolve => setTimeout(resolve, 20))
-        }
-
-        // ✅ Ajouter le message final à la conversation
-        if (selectedConversation.value) {
-            selectedConversation.value.messages.push({
-                id: Date.now() + 1,
-                role: 'assistant',
-                content: fullResponse,
-                created_at: new Date().toISOString()
-            })
-        }
-    } catch (error) {
-        console.error('Erreur:', error)
-        alert(`Erreur: ${error.message}`)
-
-        if (selectedConversation.value) {
-            selectedConversation.value.messages.pop()
-        }
-    } finally {
-        isStreaming.value = false
-        messageForm.reset('message')
-        focusMessageInput()
-    }
+  } catch (error) {
+    console.error('Erreur:', error)
+    alert(`Erreur: ${error.message}`)
+    if (selectedConversation.value) selectedConversation.value.messages.pop()
+  } finally {
+    isStreaming.value = false
+    messageForm.reset('message')
+    focusMessageInput()
+  }
 }
+
+
 
 
 const handleKeydown = (event) => {

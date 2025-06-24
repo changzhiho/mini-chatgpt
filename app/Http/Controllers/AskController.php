@@ -68,7 +68,10 @@ class AskController extends Controller
         // Préparer les messages pour l'IA
         $finalMessages = $this->prepareMessagesForAI($conversation, $user, $processedMessage, $request->message);
 
-        return response()->stream(function () use ($conversation, $finalMessages, $request, $user) {
+        // Vérifier si c'est le premier échange
+        $isFirstMessage = $conversation->messages()->count() === 1;
+
+        return response()->stream(function () use ($conversation, $finalMessages, $request, $user, $isFirstMessage, $processedMessage) {
             $fullResponse = '';
 
             (new ChatService())->sendMessageStreamed(
@@ -85,17 +88,36 @@ class AskController extends Controller
                 }
             );
 
+            // Sauvegarder le message de l'IA
             Message::create([
                 'conversation_id' => $conversation->id,
                 'role' => 'assistant',
                 'content' => $fullResponse
             ]);
 
-            if ($conversation->messages()->count() === 2 && $conversation->title === 'Nouvelle conversation') {
-                $this->titleGeneratorService->generateTitle($conversation, $request->message, $fullResponse);
-            }
+            // Générer le titre après le premier message et le streamer
+            if ($isFirstMessage && $conversation->title === 'Nouvelle conversation') {
+                // Envoyer un signal de fin de message
+                echo "\n\n__MESSAGE_END__\n\n";
+                if (ob_get_level()) {
+                    ob_flush();
+                }
+                flush();
 
-            $conversation->touch();
+                // Générer le titre
+                $title = $this->titleGeneratorService->generateTitle($conversation, $request->message, $fullResponse);
+
+                // Streamer le titre seulement s'il a été généré avec succès
+                if ($title !== null) {
+                    echo "__TITLE_START__\n";
+                    echo json_encode(['title' => $title, 'conversation_id' => $conversation->id]);
+                    echo "\n__TITLE_END__\n";
+                    if (ob_get_level()) {
+                        ob_flush();
+                    }
+                    flush();
+                }
+            }
         }, 200, [
             'Content-Type' => 'text/plain; charset=utf-8',
             'Cache-Control' => 'no-cache',
