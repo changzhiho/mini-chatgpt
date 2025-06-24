@@ -1,5 +1,3 @@
-D'après l'arborescence fournie, voici une analyse complète de votre projet Mini ChatGPT et le README correspondant :
-
 # Mini ChatGPT
 
 Un clone de ChatGPT développé avec Laravel et Vue.js, offrant une expérience de chat conversationnel complète avec support multi-conversations, partage et commandes personnalisées.
