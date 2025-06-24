@@ -1,128 +1,128 @@
 # Mini ChatGPT
 
-Un clone de ChatGPT développé avec Laravel et Vue.js, offrant une expérience de chat conversationnel complète avec support multi-conversations, partage et commandes personnalisées.
+A ChatGPT clone built with Laravel and Vue.js, offering a complete conversational chat experience with multi-conversation support, sharing, and custom commands.
 
-## 🚀 Fonctionnalités
+## 🚀 Features
 
-### Chat Intelligent
-- **Interface conversationnelle** similaire à ChatGPT
-- **Support multi-modèles** (GPT-4, GPT-3.5-turbo, etc.)
-- **Streaming en temps réel** des réponses IA
-- **Rendu Markdown** avec coloration syntaxique pour le code
+### Intelligent Chat
+- **Conversational interface** similar to ChatGPT
+- **Multi-model support** (GPT-4, GPT-3.5-turbo, etc.)
+- **Real-time streaming** of AI responses
+- **Markdown rendering** with syntax highlighting for code
 
-### Gestion des Conversations
-- **Conversations multiples** avec navigation facile
-- **Génération automatique de titres** basée sur le contenu
-- **Partage de conversations** via liens uniques (UUID)
-- **Historique persistant** des échanges
+### Conversation Management
+- **Multiple conversations** with easy navigation
+- **Automatic title generation** based on content
+- **Conversation sharing** via unique links (UUID)
+- **Persistent history** of exchanges
 
-### Personnalisation Avancée
-- **Instructions personnalisées** pour l'IA
-- **Commandes personnalisées** (ex: `/meteo`, `/help`)
-- **Préférences utilisateur** (modèle préféré, style de réponse)
-- **Interface responsive** optimisée mobile/desktop
+### Advanced Customization
+- **Custom instructions** for AI
+- **Custom commands** (e.g., `/weather`, `/help`)
+- **User preferences** (preferred model, response style)
+- **Responsive interface** optimized for mobile/desktop
 
-### Sécurité & Authentification
-- **Laravel Jetstream** avec authentification 2FA
-- **Gestion des sessions** sécurisée
-- **Tokens d'API** pour l'accès programmatique
-- **Validation CSRF** sur toutes les requêtes
+### Security & Authentication
+- **Laravel Jetstream** with 2FA authentication
+- **Secure session management**
+- **API tokens** for programmatic access
+- **CSRF validation** on all requests
 
-## 🛠️ Stack Technique
+## 🛠️ Tech Stack
 
 ### Backend
-- **Laravel 11** - Framework PHP moderne
-- **SQLite** - Base de données légère
-- **Inertia.js** - Liaison frontend/backend
-- **Laravel Sanctum** - Authentification API
+- **Laravel 11** - Modern PHP framework
+- **SQLite** - Lightweight database
+- **Inertia.js** - Frontend/backend bridge
+- **Laravel Sanctum** - API authentication
 
 ### Frontend
 - **Vue.js 3** (Composition API)
-- **Tailwind CSS** - Framework CSS utilitaire
-- **Vite** - Build tool moderne
-- **Highlight.js** - Coloration syntaxique
+- **Tailwind CSS** - Utility-first CSS framework
+- **Vite** - Modern build tool
+- **Highlight.js** - Syntax highlighting
 
 ### Services & Architecture
-- **Services métier** : `ChatService`, `ConversationService`, `CustomCommandService`
-- **Architecture MVC** avec séparation claire des responsabilités
-- **Traits réutilisables** (`HasUuid` pour les identifiants uniques)
+- **Business services**: `ChatService`, `ConversationService`, `CustomCommandService`
+- **MVC architecture** with clear separation of concerns
+- **Reusable traits** (`HasUuid` for unique identifiers)
 
-## 📁 Structure du Projet
+## 📁 Project Structure
 
 ```
 ├── app/
-│   ├── Http/Controllers/          # Contrôleurs (Ask, Commands, Instructions)
-│   ├── Models/                    # Modèles Eloquent (User, Conversation, Message)
-│   ├── Services/                  # Logique métier
-│   └── Traits/                    # Traits réutilisables
+│   ├── Http/Controllers/          # Controllers (Ask, Commands, Instructions)
+│   ├── Models/                    # Eloquent Models (User, Conversation, Message)
+│   ├── Services/                  # Business logic
+│   └── Traits/                    # Reusable traits
 ├── resources/
-│   ├── js/Pages/Ask/             # Composants Vue du chat
-│   └── views/                     # Templates Blade
+│   ├── js/Pages/Ask/             # Vue chat components
+│   └── views/                     # Blade templates
 ├── database/
-│   ├── migrations/               # Migrations de base de données
-│   └── database.sqlite          # Base de données SQLite
-└── tests/                        # Tests automatisés
+│   ├── migrations/               # Database migrations
+│   └── database.sqlite          # SQLite database
+└── tests/                        # Automated tests
 ```
 
 ## 🚀 Installation
 
-### Prérequis
+### Prerequisites
 - PHP 8.2+
 - Composer
 - Node.js 18+
 - NPM/Yarn
 
-### Étapes d'installation
+### Installation Steps
 
-1. **Cloner le projet**
+1. **Clone the project**
 ```bash
 git clone <repository-url>
 cd mini-chatgpt
 ```
 
-2. **Installer les dépendances PHP**
+2. **Install PHP dependencies**
 ```bash
 composer install
 ```
 
-3. **Installer les dépendances JavaScript**
+3. **Install JavaScript dependencies**
 ```bash
 npm install
 ```
 
-4. **Configuration de l'environnement**
+4. **Environment configuration**
 ```bash
 cp .env.example .env
 php artisan key:generate
 ```
 
-5. **Configuration de la base de données**
+5. **Database setup**
 ```bash
 touch database/database.sqlite
 php artisan migrate --seed
 ```
 
-6. **Compilation des assets**
+6. **Compile assets**
 ```bash
 npm run dev
-# ou pour la production
+# or for production
 npm run build
 ```
 
-7. **Lancer le serveur**
+7. **Start the server**
 ```bash
 php artisan serve
 ```
 
 ## ⚙️ Configuration
 
-### Variables d'environnement importantes
+### Important environment variables
 ```env
-# Base de données
+# Database
 DB_CONNECTION=sqlite
 DB_DATABASE=database/database.sqlite
 
-# API IA (à configurer selon votre provider)
+# AI API (configure according to your provider)
 OPENAI_API_KEY=your_api_key_here
 
 # Application
@@ -130,81 +130,80 @@ APP_NAME="Mini ChatGPT"
 APP_URL=http://localhost:8000
 ```
 
-### Modèles IA supportés
+### Supported AI models
 - GPT-4
 - GPT-3.5-turbo
 - (Extensible via `ChatService`)
 
-## 🧪 Tests
+## 🧪 Testing
 
-Le projet inclut une suite de tests complète :
+The project includes a comprehensive test suite:
 
 ```bash
-# Lancer tous les tests
+# Run all tests
 php artisan test
 
-# Tests spécifiques
+# Specific tests
 php artisan test --testsuite=Feature
 php artisan test --testsuite=Unit
 ```
 
-### Couverture de tests
-- ✅ Tests d'authentification
-- ✅ Tests de création/gestion des conversations
-- ✅ Tests des services métier
-- ✅ Tests d'intégration Inertia
+### Test coverage
+- ✅ Authentication tests
+- ✅ Conversation creation/management tests
+- ✅ Business service tests
+- ✅ Inertia integration tests
 
-## 📱 Fonctionnalités Détaillées
+## 📱 Detailed Features
 
-### Interface Chat
-- **Sidebar responsive** avec menu hamburger mobile
-- **Sélection de modèles** IA en temps réel
-- **Indicateurs de chargement** et états de streaming
-- **Gestion d'erreurs** avec affichage utilisateur
+### Chat Interface
+- **Responsive sidebar** with mobile hamburger menu
+- **Real-time AI model selection**
+- **Loading indicators** and streaming states
+- **Error handling** with user-friendly display
 
-### Partage de Conversations
-- **UUID uniques** pour chaque conversation
-- **Pages publiques** pour les conversations partagées
-- **Copie automatique** des liens de partage
+### Conversation Sharing
+- **Unique UUIDs** for each conversation
+- **Public pages** for shared conversations
+- **Automatic copying** of share links
 
-### Commandes Personnalisées
-- **Système extensible** de commandes slash
-- **Service météo** intégré (exemple)
-- **Interface de gestion** des commandes utilisateur
+### Custom Commands
+- **Extensible system** for slash commands
+- **Integrated weather service** (example)
+- **Management interface** for user commands
 
-## 🔧 Développement
+## 🔧 Development
 
-### Architecture des Services
-- **`ChatService`** : Communication avec l'API IA
-- **`ConversationService`** : Gestion CRUD des conversations
-- **`CustomCommandService`** : Traitement des commandes personnalisées
-- **`TitleGeneratorService`** : Génération automatique de titres
+### Service Architecture
+- **`ChatService`**: AI API communication
+- **`ConversationService`**: Conversation CRUD management
+- **`CustomCommandService`**: Custom command processing
+- **`TitleGeneratorService`**: Automatic title generation
 
-### Composants Vue Principaux
-- **`Index.vue`** : Composant principal du chat
-- **`Sidebar.vue`** : Navigation des conversations
-- **`MessagesList.vue`** : Affichage des messages
-- **`MessageInput.vue`** : Zone de saisie
+### Main Vue Components
+- **`Index.vue`**: Main chat component
+- **`Sidebar.vue`**: Conversation navigation
+- **`MessagesList.vue`**: Message display
+- **`MessageInput.vue`**: Input area
 
-## 📄 Licence
+## 📄 License
 
-Ce projet est sous licence MIT. Voir le fichier `LICENSE` pour plus de détails.
+This project is licensed under the MIT License. See the `LICENSE` file for more details.
 
-## 🤝 Contribution
+## 🤝 Contributing
 
-Les contributions sont les bienvenues ! Merci de :
-1. Fork le projet
-2. Créer une branche feature
-3. Commiter vos changements
-4. Ouvrir une Pull Request
+Contributions are welcome! Please:
+1. Fork the project
+2. Create a feature branch
+3. Commit your changes
+4. Open a Pull Request
 
 ## 📞 Support
 
-Pour toute question ou problème, n'hésitez pas à ouvrir une issue sur GitHub.
+For any questions or issues, feel free to open an issue on GitHub.
 
 ---
 
-**Mini ChatGPT** - Une expérience de chat IA moderne et personnalisable 🚀
+**Mini ChatGPT** - A modern and customizable AI chat experience 🚀
 
 Sources
-[1] arborescence.txt https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/69806952/e3742b27-5126-4f00-9bb7-119975cf4262/arborescence.txt
