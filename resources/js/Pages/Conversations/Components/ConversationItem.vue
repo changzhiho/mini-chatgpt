@@ -13,6 +13,7 @@ const emit = defineEmits([
     'delete'
 ])
 
+// Formatage intelligent de date relative (aujourd'hui, hier, X jours)
 const formatDate = (dateString) => {
     const date = new Date(dateString)
     const now = new Date()

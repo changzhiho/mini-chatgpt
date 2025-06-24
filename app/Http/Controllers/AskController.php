@@ -35,6 +35,9 @@ class AskController extends Controller
         ]);
     }
 
+    /**
+     * Traitement des messages avec streaming et génération automatique de titre
+     */
     public function ask(Request $request)
     {
         $request->validate([
@@ -45,7 +48,7 @@ class AskController extends Controller
 
         $user = Auth::user();
 
-        // Créer ou récupérer la conversation
+        // Gestion conversation existante ou création automatique
         if ($request->conversation_id) {
             $conversation = Conversation::findOrFail($request->conversation_id);
             $conversation->update(['model' => $request->model]);
@@ -55,20 +58,16 @@ class AskController extends Controller
 
         $user->update(['preferred_model' => $request->model]);
 
-        // Traiter les commandes personnalisées
         $processedMessage = $this->customCommandService->processCommands($request->message, $user);
 
-        // Sauvegarder le message utilisateur
         Message::create([
             'conversation_id' => $conversation->id,
             'role' => 'user',
             'content' => $request->message
         ]);
 
-        // Préparer les messages pour l'IA
         $finalMessages = $this->prepareMessagesForAI($conversation, $user, $processedMessage, $request->message);
 
-        // Vérifier si c'est le premier échange
         $isFirstMessage = $conversation->messages()->count() === 1;
 
         return response()->stream(function () use ($conversation, $finalMessages, $request, $user, $isFirstMessage, $processedMessage) {
@@ -88,26 +87,23 @@ class AskController extends Controller
                 }
             );
 
-            // Sauvegarder le message de l'IA
+            // Sauvegarde du message IA complet
             Message::create([
                 'conversation_id' => $conversation->id,
                 'role' => 'assistant',
                 'content' => $fullResponse
             ]);
 
-            // Générer le titre après le premier message et le streamer
+            // Génération et streaming du titre après le premier échange
             if ($isFirstMessage && $conversation->title === 'Nouvelle conversation') {
-                // Envoyer un signal de fin de message
                 echo "\n\n__MESSAGE_END__\n\n";
                 if (ob_get_level()) {
                     ob_flush();
                 }
                 flush();
 
-                // Générer le titre
                 $title = $this->titleGeneratorService->generateTitle($conversation, $request->message, $fullResponse);
 
-                // Streamer le titre seulement s'il a été généré avec succès
                 if ($title !== null) {
                     echo "__TITLE_START__\n";
                     echo json_encode(['title' => $title, 'conversation_id' => $conversation->id]);
@@ -156,8 +152,12 @@ class AskController extends Controller
         return redirect()->back()->with($shareData);
     }
 
+    /**
+     * Préparation du contexte IA : instructions utilisateur + historique messages
+     */
     private function prepareMessagesForAI($conversation, $user, $processedMessage, $originalMessage)
     {
+        // Ajout des instructions personnalisées de l'utilisateur
         $systemMessages = [];
         if ($user->instructions_about || $user->instructions_how) {
             $instructions = "Instructions personnalisées de l'utilisateur :\n";
@@ -173,10 +173,12 @@ class AskController extends Controller
             ];
         }
 
+        // Récupération et formatage de l'historique des messages
         $userMessages = $conversation->messages()
             ->orderBy('created_at', 'asc')
             ->get()
             ->map(function ($message) use ($processedMessage, $originalMessage) {
+                // Remplacement du message original par la version traitée (commandes)
                 if ($message->content === $originalMessage && $message->role === 'user') {
                     return [
                         'role' => $message->role,

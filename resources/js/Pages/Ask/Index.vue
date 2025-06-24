@@ -19,14 +19,14 @@ const props = defineProps({
     errors: Object,
 })
 
+// Instance MarkdownIt pour le rendu des messages avec coloration syntaxique
 let md = null
 
-// ✅ Sauvegarder la position de scroll de la page
+// Gestion de la persistance du scroll de page
 const savePageScrollPosition = () => {
     localStorage.setItem('ask-page-scroll', window.scrollY.toString())
 }
 
-// ✅ Restaurer la position de scroll de la page
 const restorePageScrollPosition = () => {
     nextTick(() => {
         const saved = localStorage.getItem('ask-page-scroll')
@@ -37,6 +37,7 @@ const restorePageScrollPosition = () => {
 }
 
 onMounted(() => {
+    // Configuration MarkdownIt avec highlight.js pour la coloration syntaxique
     md = new MarkdownIt({
         html: true,
         linkify: true,
@@ -52,18 +53,14 @@ onMounted(() => {
             return '<pre class="hljs"><code>' + md.utils.escapeHtml(str) + '</code></pre>'
         }
     })
+
     initializeConversationSelection()
     document.addEventListener('click', closeSettingsMenu)
-
-    // ✅ Restaurer le scroll de la page
     restorePageScrollPosition()
-
-    // ✅ Écouter le scroll de la page
     window.addEventListener('scroll', savePageScrollPosition)
 })
 
 onBeforeUnmount(() => {
-    // ✅ Sauvegarder avant de quitter
     savePageScrollPosition()
     window.removeEventListener('scroll', savePageScrollPosition)
 })
@@ -73,6 +70,7 @@ onUnmounted(() => {
     window.removeEventListener('scroll', savePageScrollPosition)
 })
 
+// État réactif de l'application
 const selectedConversation = ref(null)
 const currentModel = ref(props.selectedModel)
 const messagesList = ref(null)
@@ -82,6 +80,7 @@ const showSettingsMenu = ref(false)
 const isStreaming = ref(false)
 const currentAIMessage = ref('')
 
+// Formulaires Inertia
 const messageForm = useForm({
     message: '',
     conversation_id: null,
@@ -96,6 +95,7 @@ const currentMessages = computed(() => {
     return selectedConversation.value?.messages || []
 })
 
+// Logique de sélection de conversation au chargement
 const initializeConversationSelection = () => {
     if (props.flash?.selectedConversationId) {
         const conversation = props.conversations.find(c => c.id === props.flash.selectedConversationId)
@@ -134,16 +134,16 @@ const focusMessageInput = () => {
     }
 }
 
-// ✅ Modifier selectConversation pour préserver le scroll
 const selectConversation = (conversation) => {
     selectedConversation.value = conversation
     currentModel.value = conversation.model || props.selectedModel
     messageForm.conversation_id = conversation.id
     messageForm.model = conversation.model || props.selectedModel
 
+    // Navigation Inertia avec préservation d'état
     router.visit(`/ask?conversation=${conversation.id}`, {
         preserveState: true,
-        preserveScroll: true, // ✅ Préserver le scroll
+        preserveScroll: true,
         only: []
     })
 
@@ -155,20 +155,22 @@ const selectConversation = (conversation) => {
 const createNewConversation = () => {
     conversationForm.model = currentModel.value
     conversationForm.post(route('ask.new'), {
-        preserveScroll: true, // ✅ Préserver le scroll
+        preserveScroll: true,
     })
 }
 
 const deleteConversation = (conversationId) => {
     if (!confirm('Êtes-vous sûr de vouloir supprimer cette conversation ?')) return
     router.delete(route('ask.delete', conversationId), {
-        preserveScroll: true, // ✅ Préserver le scroll
+        preserveScroll: true,
     })
 }
 
+// Fonction principale de streaming avec gestion des titres automatiques
 const sendMessageWithStreaming = async () => {
   if (!messageForm.message.trim() || isStreaming.value) return
 
+  // Ajouter le message utilisateur immédiatement à l'interface
   if (selectedConversation.value) {
     selectedConversation.value.messages.push({
       id: Date.now(),
@@ -182,6 +184,7 @@ const sendMessageWithStreaming = async () => {
   currentAIMessage.value = ''
 
   try {
+    // Requête fetch avec token CSRF
     const response = await fetch(route('ask.post'), {
       method: 'POST',
       headers: {
@@ -197,6 +200,7 @@ const sendMessageWithStreaming = async () => {
 
     if (!response.ok) throw new Error(`Erreur: ${response.status}`)
 
+    // Streaming avec ReadableStream API
     const reader = response.body.getReader()
     const decoder = new TextDecoder()
     let buffer = ''
@@ -208,15 +212,18 @@ const sendMessageWithStreaming = async () => {
 
       buffer += decoder.decode(value, { stream: true })
 
+      // Détection de la fin du message IA
       if (buffer.includes('__MESSAGE_END__')) {
         messageComplete = true
         buffer = buffer.replace('__MESSAGE_END__', '')
       }
 
+      // Traitement du streaming de titre après fin du message
       if (messageComplete && buffer.includes('__TITLE_START__') && buffer.includes('__TITLE_END__')) {
         const titleJson = buffer.match(/__TITLE_START__\n(.*?)\n__TITLE_END__/s)
         if (titleJson) {
           const titleData = JSON.parse(titleJson[1])
+          // Mise à jour réactive du titre dans la conversation et la sidebar
           if (selectedConversation.value?.id === titleData.conversation_id) {
             selectedConversation.value.title = titleData.title
           }
@@ -226,6 +233,7 @@ const sendMessageWithStreaming = async () => {
         buffer = ''
       }
 
+      // Streaming du contenu du message
       if (!messageComplete) {
         currentAIMessage.value += buffer
         buffer = ''
@@ -233,6 +241,7 @@ const sendMessageWithStreaming = async () => {
       }
     }
 
+    // Ajouter le message final à la conversation
     if (selectedConversation.value) {
       selectedConversation.value.messages.push({
         id: Date.now() + 1,
@@ -251,9 +260,6 @@ const sendMessageWithStreaming = async () => {
     focusMessageInput()
   }
 }
-
-
-
 
 const handleKeydown = (event) => {
     if (event.key === 'Enter' && !event.shiftKey) {
@@ -280,11 +286,13 @@ const shareConversation = (conversation) => {
     })
 }
 
+// Watchers pour la synchronisation d'état
 watch(currentModel, (newModel) => {
     messageForm.model = newModel
     conversationForm.model = newModel
 })
 
+// Synchronisation des conversations mises à jour depuis le serveur
 watch(() => props.conversations, (newConversations) => {
     if (selectedConversation.value) {
         const updatedConversation = newConversations.find(c => c.id === selectedConversation.value.id)
@@ -294,13 +302,14 @@ watch(() => props.conversations, (newConversations) => {
     }
 }, { deep: true })
 
+// Réinitialisation lors de changements de conversations
 watch(() => props.conversations, (newConversations, oldConversations) => {
     if (newConversations.length !== oldConversations?.length) {
         initializeConversationSelection()
     }
 }, { immediate: false })
 
-// ✅ Modifier le watch pour préserver le scroll
+// Gestion des redirections et focus depuis le serveur
 watch(() => props.flash, (newFlash, oldFlash) => {
     if (newFlash?.selectedConversationId && newFlash.selectedConversationId !== oldFlash?.selectedConversationId) {
         const conversation = props.conversations.find(c => c.id === newFlash.selectedConversationId)
@@ -310,7 +319,6 @@ watch(() => props.flash, (newFlash, oldFlash) => {
     }
     if (newFlash?.shouldFocusInput) {
         focusMessageInput()
-        // ✅ Restaurer le scroll du chat après retour des instructions
         if (messagesList.value) {
             messagesList.value.restoreScrollPosition()
         }
@@ -321,7 +329,7 @@ watch(() => props.flash, (newFlash, oldFlash) => {
 <template>
     <AppLayout title="Ask AI">
         <div class="flex h-screen bg-gray-50 dark:bg-gray-900">
-            <!-- Overlay pour fermer le menu sur mobile -->
+            <!-- Overlay mobile pour fermer la sidebar -->
             <div
                 v-if="isSidebarOpen"
                 class="fixed inset-0 bg-black bg-opacity-50 z-10 md:hidden"
@@ -343,7 +351,7 @@ watch(() => props.flash, (newFlash, oldFlash) => {
                 @deleteConversation="deleteConversation"
             />
 
-            <!-- Main Chat Area -->
+            <!-- Zone de chat principale -->
             <div class="flex-1 flex flex-col">
                 <ChatHeader
                     :selectedConversation="selectedConversation"

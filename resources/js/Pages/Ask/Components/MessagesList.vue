@@ -29,7 +29,7 @@ const restoreScrollPosition = () => {
     })
 }
 
-// ✅ Fonction de scroll avec nextTick
+
 const scrollToBottomForStreaming = () => {
     nextTick(() => {
         if (messagesContainer.value) {
@@ -61,25 +61,24 @@ watch(() => props.selectedConversation?.id, () => {
     }
 }, { immediate: true })
 
-// ✅ Watch simplifié pour le streaming
+//Watch simplifié pour le streaming
 watch(() => props.isStreaming, (isStreaming) => {
     if (isStreaming) {
-        // Début du streaming : scroll en bas
+
         scrollToBottomForStreaming()
     }
 })
 
-// ✅ Watch pour scroll pendant le streaming - AVEC nextTick
+//Watch pour scroll pendant le streaming
 watch(() => props.currentAIMessage, () => {
     if (props.isStreaming) {
         scrollToBottomForStreaming()
     }
 })
 
-// ✅ Watch pour la fin du streaming
+//Watch pour la fin du streaming
 watch(() => props.isStreaming, (newIsStreaming, oldIsStreaming) => {
     if (oldIsStreaming && !newIsStreaming) {
-        // Fin du streaming : scroll en bas et sauvegarder
         nextTick(() => {
             scrollToBottomForStreaming()
             setTimeout(() => {
@@ -89,7 +88,6 @@ watch(() => props.isStreaming, (newIsStreaming, oldIsStreaming) => {
     }
 })
 
-// ✅ EXPOSER la fonction pour Index.vue
 defineExpose({
     saveScrollPosition,
     restoreScrollPosition,
@@ -98,9 +96,7 @@ defineExpose({
 </script>
 
 <template>
-    <!-- ✅ GARDE ce div avec la ref pour le scroll -->
     <div ref="messagesContainer" class="flex-1 overflow-y-auto">
-        <!-- ✅ Conteneur centré à l'intérieur -->
         <div class="max-w-3xl mx-auto p-4 space-y-4">
             <div v-if="!selectedConversation" class="text-center text-gray-500 mt-20">
                 <svg class="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
