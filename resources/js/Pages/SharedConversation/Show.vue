@@ -10,7 +10,6 @@ const props = defineProps({
     owner: Object,
 })
 
-// Configuration markdown identique à votre chat
 const md = new MarkdownIt({
     html: true,
     linkify: true,

@@ -20,7 +20,6 @@ class ChatPageAccessTest extends TestCase
 
         $response->assertStatus(200);
 
-        //Teste la réponse Inertia au lieu du HTML car Ask AI dans composant Vue
         $response->assertInertia(
             fn(Assert $page) =>
             $page->component('Ask/Index')

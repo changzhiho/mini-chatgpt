@@ -17,7 +17,6 @@ const props = defineProps({
             :align-right="message.role === 'user'"
             :always-visible="message.role !== 'user'"
         >
-            <!-- ✅ Option 3 : Marges dynamiques avec Tailwind -->
             <div :class="[
                 'flex items-start gap-3 max-w-[80%]',
                 message.role === 'user' ? 'flex-row-reverse ml-8 md:ml-16' : 'flex-row mr-8 md:mr-16'

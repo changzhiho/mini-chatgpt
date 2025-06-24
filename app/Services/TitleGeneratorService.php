@@ -6,7 +6,7 @@ use App\Models\Conversation;
 
 class TitleGeneratorService
 {
-    public function generateTitle(Conversation $conversation, string $userMessage, string $aiResponse): void
+    public function generateTitle(Conversation $conversation, string $userMessage, string $aiResponse): ?string
     {
         try {
             $titleMessages = [
@@ -33,9 +33,16 @@ class TitleGeneratorService
                 model: ChatService::DEFAULT_MODEL
             );
 
-            $conversation->update(['title' => trim($title)]);
+            $cleanTitle = trim($title);
+
+            // Mettre à jour la conversation avec le nouveau titre
+            $conversation->update(['title' => $cleanTitle]);
+
+            // Retourner le titre pour le streaming
+            return $cleanTitle;
         } catch (\Exception $e) {
-            // En cas d'erreur, garder le titre par défaut
+            // En cas d'erreur, ne pas changer le titre
+            return null;
         }
     }
 }

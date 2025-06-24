@@ -5,6 +5,10 @@ namespace App\Services;
 use Illuminate\Support\Facades\Http;
 use GuzzleHttp\Client;
 
+/**
+ * Service de gestion des interactions avec l'API OpenRouter/OpenAI
+ * Gère à la fois les réponses classiques et le streaming en temps réel
+ */
 class ChatService
 {
     private $baseUrl;
@@ -19,6 +23,10 @@ class ChatService
         $this->client = $this->createOpenAIClient();
     }
 
+    /**
+     * Récupération des modèles disponibles avec mise en cache (1h)
+     * Optimise les performances en évitant les appels API répétés
+     */
     public function getModels(): array
     {
         return cache()->remember('openai.models', now()->addHour(), function () {
@@ -42,14 +50,19 @@ class ChatService
         });
     }
 
+    /**
+     * Envoi de message classique (non-streamé) pour génération de titres
+     */
     public function sendMessage(array $messages, string $model = null, float $temperature = 0.7): string
     {
         try {
+            // Validation et fallback du modèle
             $models = collect($this->getModels());
             if (!$model || !$models->contains('id', $model)) {
                 $model = self::DEFAULT_MODEL;
             }
 
+            // Injection du prompt système avec contexte utilisateur
             $messages = [$this->getChatSystemPrompt(), ...$messages];
             $response = $this->client->chat()->create([
                 'model' => $model,
@@ -67,8 +80,13 @@ class ChatService
         }
     }
 
+    /**
+     * Streaming de messages en temps réel via Server-Sent Events (SSE)
+     * Utilise Guzzle pour le streaming HTTP et callback pour chaque chunk
+     */
     public function sendMessageStreamed(array $messages, string $model, callable $onChunk): void
     {
+        // Validation du modèle
         $models = collect($this->getModels());
         if (!$model || !$models->contains('id', $model)) {
             $model = self::DEFAULT_MODEL;
@@ -76,6 +94,7 @@ class ChatService
 
         $messages = [$this->getChatSystemPrompt(), ...$messages];
 
+        // Configuration de la requête streaming
         $url = $this->baseUrl . '/chat/completions';
         $headers = [
             'Authorization' => 'Bearer ' . $this->apiKey,
@@ -91,16 +110,18 @@ class ChatService
         $response = $guzzle->post($url, [
             'headers' => $headers,
             'json' => $body,
-            'stream' => true,
+            'stream' => true, // Stream HTTP pour lecture chunk par chunk
         ]);
 
         $stream = $response->getBody();
-        $buffer = '';
+        $buffer = ''; // Buffer pour gérer les chunks partiels
 
+        // Lecture du stream en continu
         while (!$stream->eof()) {
             $chunk = $stream->read(1024);
             $buffer .= $chunk;
 
+            // Traitement ligne par ligne (format SSE)
             $lines = explode("\n", $buffer);
             $buffer = array_pop($lines);
 

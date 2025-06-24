@@ -6,14 +6,15 @@ use App\Models\User;
 
 class CustomCommandService
 {
+    // Traite les commandes personnalisées et intégrées de l'utilisateur
     public function processCommands(string $message, User $user): string
     {
-        // Commande météo
+        // Commande météo intégrée
         if (strpos(trim($message), '/meteo') === 0) {
             return $this->processWeatherCommand($message);
         }
 
-        // Commandes personnalisées
+        // Traitement des commandes personnalisées de l'utilisateur
         if (!$user->custom_commands) {
             return $message;
         }
@@ -34,6 +35,7 @@ class CustomCommandService
         return $message;
     }
 
+    // Traite la commande météo avec appel au service WeatherService
     private function processWeatherCommand(string $message): string
     {
         $city = trim(substr($message, 6));
@@ -55,6 +57,7 @@ class CustomCommandService
         return "Météo actuelle à {$city}: {$temp}°C, {$description}, humidité {$humidity}%. Présente ces informations de manière naturelle.";
     }
 
+    // Parse les commandes personnalisées depuis le format texte utilisateur
     private function parseCustomCommands(string $customCommands): array
     {
         $commands = [];
@@ -64,6 +67,7 @@ class CustomCommandService
             $line = trim($line);
             if (empty($line)) continue;
 
+            // Format attendu: /commande : description
             if (preg_match('/^(\/\w+)\s*:\s*(.+)$/', $line, $matches)) {
                 $command = trim($matches[1]);
                 $description = trim($matches[2]);
