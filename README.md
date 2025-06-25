@@ -205,5 +205,3 @@ For any questions or issues, feel free to open an issue on GitHub.
 ---
 
 **Mini ChatGPT** - A modern and customizable AI chat experience 🚀
-
-Sources
